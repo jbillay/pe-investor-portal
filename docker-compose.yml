@@ -1,0 +1,291 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: myapp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: myapp
+      POSTGRES_USER: myapp_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-myapp_secure_password}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myapp_user -d myapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+
+  # Redis Cache & Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: myapp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+  # Database Migration Service
+  db-migrate:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+      target: migration
+    container_name: myapp-db-migrate
+    environment:
+      DATABASE_URL: postgresql://myapp_user:${POSTGRES_PASSWORD:-myapp_secure_password}@postgres:5432/myapp?schema=public
+      NODE_ENV: production
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # Database Seeding Service (optional, run manually)
+  db-seed:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+      target: seed
+    container_name: myapp-db-seed
+    environment:
+      DATABASE_URL: postgresql://myapp_user:${POSTGRES_PASSWORD:-myapp_secure_password}@postgres:5432/myapp?schema=public
+      NODE_ENV: production
+    networks:
+      - app_network
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    profiles:
+      - seed
+    restart: "no"
+
+  # Backend API Service
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+      target: production
+      args:
+        NODE_ENV: production
+    container_name: myapp-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://myapp_user:${POSTGRES_PASSWORD:-myapp_secure_password}@postgres:5432/myapp?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secure-jwt-secret-change-this-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-super-secure-refresh-secret-change-this}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your-nextauth-secret-change-this-in-production}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      
+      # CORS Configuration
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:80,http://localhost:3001}
+      
+      # File Upload Configuration
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760} # 10MB
+      UPLOAD_DIR: /app/uploads
+      
+      # Email Configuration (optional)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      
+      # OAuth Providers (optional)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      
+      # Monitoring
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENABLE_METRICS: ${ENABLE_METRICS:-true}
+    
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+      target: production
+      args:
+        NODE_ENV: production
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000}
+        VITE_APP_NAME: ${VITE_APP_NAME:-MyApp}
+        VITE_AUTH_URL: ${VITE_AUTH_URL:-http://localhost:3000/auth}
+        VITE_UPLOAD_MAX_SIZE: ${VITE_UPLOAD_MAX_SIZE:-10485760}
+    container_name: myapp-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - app_network
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    volumes:
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro # SSL certificates (if available)
+
+  # Monitoring Services (Optional)
+  
+  # Redis Commander - Redis GUI (Development/Staging only)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: myapp-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: redis:redis:6379
+      HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin123}
+    ports:
+      - "8081:8081"
+    networks:
+      - app_network
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - monitoring
+      - development
+
+  # pgAdmin - PostgreSQL GUI (Development/Staging only)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: myapp-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - monitoring
+      - development
+
+  # Backup Service
+  backup:
+    image: postgres:15-alpine
+    container_name: myapp-backup
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-myapp_secure_password}
+    volumes:
+      - ./backups:/backups
+      - ./docker/scripts/backup.sh:/backup.sh:ro
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - backup
+    command: ["sh", "/backup.sh"]
+    restart: "no"
+
+  # Log Aggregation (Optional)
+  # Uncomment if you need centralized logging
+  # loki:
+  #   image: grafana/loki:latest
+  #   container_name: myapp-loki
+  #   ports:
+  #     - "3100:3100"
+  #   volumes:
+  #     - loki_data:/loki
+  #   networks:
+  #     - app_network
+  #   profiles:
+  #     - monitoring
+
+# Networks
+networks:
+  app_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volumes
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_logs:
+    driver: local
+  pgadmin_data:
+    driver: local
+  # loki_data:
+  #   driver: local
