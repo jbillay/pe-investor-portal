@@ -16,7 +16,6 @@ This project is a multi-tenant enterprise application with secure document manag
 - **Runtime**: Node.js with TypeScript
 - **Framework**: NestJS (enterprise-grade with dependency injection)
 - **Database**: PostgreSQL with Prisma ORM
-- **Caching**: Redis for sessions and performance
 - **Authentication**: NextAuth.js with JWT + refresh token rotation
 
 ### Security & Multi-tenancy
@@ -27,8 +26,8 @@ This project is a multi-tenant enterprise application with secure document manag
 
 ### Development & Deployment
 - **Containerization**: Docker + Docker Compose
-- **Package Manager**: pnpm or yarn workspaces (monorepo)
-- **Code Quality**: ESLint + Prettier + Husky + lint-staged
+- **Package Manager**: npm
+- **Code Quality**: Prettier + Husky + lint-staged
 - **Testing**: Jest framework
 - **Document Viewing**: PDF.js for in-browser rendering
 
@@ -44,7 +43,6 @@ This project is a multi-tenant enterprise application with secure document manag
 ### Database Patterns
 - Always use Prisma schema for database changes
 - Implement proper migrations for schema updates
-- Use Row-Level Security for tenant data isolation
 - Index frequently queried fields
 - Use transactions for complex operations
 
@@ -64,7 +62,7 @@ This project is a multi-tenant enterprise application with secure document manag
 
 ### Frontend Patterns
 - Use Vue 3 Composition API consistently
-- Implement proper component composition
+- Implement proper component composition for each UI elements
 - Use Pinia stores for shared state
 - Apply Tailwind utility classes following atomic design
 - Implement proper form validation with VeeValidate
@@ -85,6 +83,7 @@ project-root/
 │   │   ├── src/
 │   │   │   ├── components/ # Reusable Vue components
 │   │   │   ├── views/      # Page components
+│   │   │   ├── docs/       # Documentation
 │   │   │   ├── stores/     # Pinia stores
 │   │   │   ├── composables/# Vue composables
 │   │   │   └── types/      # TypeScript type definitions
@@ -94,11 +93,11 @@ project-root/
 │       │   ├── modules/    # Feature modules
 │       │   ├── common/     # Shared utilities
 │       │   ├── guards/     # Authentication guards
-│       │   └── types/      # TypeScript definitions
+│       │   ├── types/      # TypeScript definitions
+│   │   │   └── prisma/     # Prisma schema and migrations
 │       └── ...
 ├── packages/
 │   ├── shared/             # Shared types and utilities
-│   └── database/           # Prisma schema and migrations
 ├── docker/                 # Docker configuration
 └── docs/                   # Project documentation
 ```
@@ -108,29 +107,28 @@ project-root/
 ### Development Setup
 ```bash
 # Install dependencies
-pnpm install
+npm install
 
 # Start development environment
 docker-compose up -d  # Database and Redis
-pnpm dev             # Start both frontend and backend
+npm dev             # Start both frontend and backend
 
 # Database operations
-pnpm db:migrate     # Run Prisma migrations
-pnpm db:seed        # Seed development data
-pnpm db:studio      # Open Prisma Studio
+npm db:migrate     # Run Prisma migrations
+npm db:seed        # Seed development data
+npm db:studio      # Open Prisma Studio
 ```
 
 ### Code Quality
 ```bash
 # Linting and formatting
-pnpm lint           # Run ESLint
-pnpm format         # Run Prettier
-pnpm type-check     # TypeScript validation
+npm format         # Run Prettier
+npm type-check     # TypeScript validation
 
 # Testing
-pnpm test           # Run all tests
-pnpm test:watch     # Run tests in watch mode
-pnpm test:coverage  # Generate coverage report
+npm test           # Run all tests
+npm test:watch     # Run tests in watch mode
+npm test:coverage  # Generate coverage report
 ```
 
 ## Key Implementation Patterns
@@ -138,14 +136,7 @@ pnpm test:coverage  # Generate coverage report
 ### Authentication Flow
 - Use NextAuth.js providers for OAuth integration
 - Implement custom JWT strategy with refresh tokens
-- Store session data in Redis for scalability
 - Apply route guards in both frontend and backend
-
-### Multi-tenant Architecture
-- Use tenant ID in all database queries
-- Implement RLS policies for automatic data isolation
-- Store tenant-specific configuration in database
-- Use middleware to inject tenant context
 
 ### Document Management
 - Generate presigned URLs for secure upload/download
@@ -160,7 +151,6 @@ pnpm test:coverage  # Generate coverage report
 - Return user-friendly error messages
 
 ### Performance Optimization
-- Use Redis for caching frequently accessed data
 - Implement proper database indexing
 - Use lazy loading for Vue components
 - Apply pagination for large data sets
@@ -170,15 +160,13 @@ pnpm test:coverage  # Generate coverage report
 ### Always Consider
 1. **Type Safety**: Ensure all code is properly typed
 2. **Security**: Validate inputs and implement proper authorization
-3. **Multi-tenancy**: Include tenant isolation in data operations
-4. **Error Handling**: Implement comprehensive error handling
-5. **Testing**: Suggest testable code patterns
-6. **Performance**: Consider caching and optimization opportunities
+3. **Error Handling**: Implement comprehensive error handling
+4. **Testing**: Suggest testable code patterns
+5. **Performance**: Consider optimization opportunities
 
 ### Code Review Checklist
 - [ ] TypeScript types are properly defined
 - [ ] Authentication/authorization is implemented
-- [ ] Tenant data isolation is maintained
 - [ ] Error handling is comprehensive
 - [ ] Database queries are optimized
 - [ ] Security best practices are followed
