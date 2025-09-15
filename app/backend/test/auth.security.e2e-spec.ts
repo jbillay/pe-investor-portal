@@ -3,7 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import * as request from 'supertest';
+import request from 'supertest';
 import * as bcrypt from 'bcrypt';
 
 import { AuthModule } from '../src/auth/auth.module';
@@ -81,7 +81,6 @@ describe('Authentication Security (e2e)', () => {
   });
 
   describe('Password Security', () => {
-
     it('should enforce password complexity requirements', async () => {
       const weakPasswords = [
         'password', // Too common
@@ -205,11 +204,10 @@ describe('Authentication Security (e2e)', () => {
 
     it('should reject expired tokens', async () => {
       // Create a token that expires immediately
-      const shortLivedToken = await authService['generateTokens'](
-        user.id,
-        user.email,
-        '1ms',
-      );
+      const shortLivedToken = await authService['generateTokens']({
+        sub: user.id,
+        email: user.email,
+      });
 
       // Wait for token to expire
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -221,10 +219,10 @@ describe('Authentication Security (e2e)', () => {
     });
 
     it('should reject tokens with invalid signatures', async () => {
-      const validTokens = await authService['generateTokens'](
-        user.id,
-        user.email,
-      );
+      const validTokens = await authService['generateTokens']({
+        sub: user.id,
+        email: user.email,
+      });
 
       // Tamper with the token signature
       const tamperedToken = validTokens.accessToken.slice(0, -5) + 'XXXXX';
@@ -258,7 +256,6 @@ describe('Authentication Security (e2e)', () => {
   });
 
   describe('Rate Limiting Security', () => {
-
     it('should enforce rate limits on registration endpoint', async () => {
       const registerDto: RegisterDto = {
         email: 'test@example.com',
@@ -324,7 +321,6 @@ describe('Authentication Security (e2e)', () => {
   });
 
   describe('Input Validation Security', () => {
-
     it('should reject SQL injection attempts in registration', async () => {
       const maliciousInputs = [
         "'; DROP TABLE users; --",
@@ -550,15 +546,13 @@ describe('Authentication Security (e2e)', () => {
       });
 
       expect(session).toBeDefined();
-      expect(session.userAgent).toBe('Test Security Agent');
-      expect(session.ipAddress).toBe('203.0.113.1');
-      expect(session.userId).toBe(user.id);
+      expect(session?.userAgent).toBe('Test Security Agent');
+      expect(session?.ipAddress).toBe('203.0.113.1');
+      expect(session?.userId).toBe(user.id);
     });
   });
 
-
   describe('Error Information Disclosure', () => {
-
     it('should not disclose sensitive information in error messages', async () => {
       // Try to login with non-existent user
       const response = await request(app.getHttpServer())

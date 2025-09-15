@@ -48,7 +48,7 @@ async function bootstrap() {
       'dev@pe-portal.com',
     )
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
-    .addServer('http://localhost:3000', 'Development Server')
+    .addServer('http://localhost:5173', 'Development Server')
     .addServer('https://api.pe-portal.com', 'Production Server')
     .addBearerAuth(
       {

@@ -1,11 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import * as request from 'supertest';
+import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
-import { TestDataGenerator } from './utils/test-utils';
 import * as bcrypt from 'bcrypt';
 
 describe('Authentication (e2e)', () => {
@@ -52,7 +51,6 @@ describe('Authentication (e2e)', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
-    redis = app.get(RedisService);
   });
 
   afterAll(async () => {
@@ -72,15 +70,6 @@ describe('Authentication (e2e)', () => {
     await prisma.session.deleteMany({});
     await prisma.userProfile.deleteMany({});
     await prisma.user.deleteMany({});
-
-    // Clear Redis
-    try {
-      const client = redis.getClient();
-      await client.flushall();
-    } catch (error) {
-      // Redis might not be available in test environment
-      console.warn('Redis cleanup failed:', error.message);
-    }
   }
 
   async function createTestUser(hashedPassword?: string) {
@@ -126,12 +115,12 @@ describe('Authentication (e2e)', () => {
       });
 
       expect(createdUser).toBeTruthy();
-      expect(createdUser.email).toBe(registerDto.email);
-      expect(createdUser.firstName).toBe(registerDto.firstName);
-      expect(createdUser.lastName).toBe(registerDto.lastName);
-      expect(createdUser.profile).toBeTruthy();
-      expect(createdUser.isActive).toBe(true);
-      expect(createdUser.isVerified).toBe(false);
+      expect(createdUser?.email).toBe(registerDto.email);
+      expect(createdUser?.firstName).toBe(registerDto.firstName);
+      expect(createdUser?.lastName).toBe(registerDto.lastName);
+      expect(createdUser?.profile).toBeTruthy();
+      expect(createdUser?.isActive).toBe(true);
+      expect(createdUser?.isVerified).toBe(false);
     });
 
 
@@ -168,11 +157,11 @@ describe('Authentication (e2e)', () => {
         .expect(400);
 
       expect(response.body.message).toBeInstanceOf(Array);
-      expect(response.body.message.some((msg) => msg.includes('email'))).toBe(
+      expect(response.body.message.some((msg: any) => msg.includes('email'))).toBe(
         true,
       );
       expect(
-        response.body.message.some((msg) => msg.includes('password')),
+        response.body.message.some((msg: any) => msg.includes('password')),
       ).toBe(true);
     });
   });
@@ -207,7 +196,7 @@ describe('Authentication (e2e)', () => {
       const updatedUser = await prisma.user.findUnique({
         where: { id: testUser.id },
       });
-      expect(updatedUser.lastLogin).toBeTruthy();
+      expect(updatedUser?.lastLogin).toBeTruthy();
     });
 
     it('should return 401 for invalid credentials', async () => {
@@ -347,7 +336,7 @@ describe('Authentication (e2e)', () => {
       const session = await prisma.session.findUnique({
         where: { refreshToken },
       });
-      expect(session.isRevoked).toBe(true);
+      expect(session?.isRevoked).toBe(true);
 
       // Refresh token should not work anymore
       await request(app.getHttpServer())
@@ -581,7 +570,7 @@ describe('Authentication (e2e)', () => {
 
       const activeSessions = await prisma.session.findMany({
         where: {
-          userId: user.id,
+          userId: user?.id,
           isRevoked: false,
         },
       });
