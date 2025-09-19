@@ -72,21 +72,8 @@
         </div>
       </div>
 
-      <!-- Performance Chart Placeholder -->
-      <div class="bg-white rounded-lg shadow-soft border border-gray-200">
-        <div class="px-6 py-4 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900">Performance Trend</h2>
-        </div>
-        <div class="p-6">
-          <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-            <div class="text-center">
-              <i class="pi pi-chart-line text-4xl text-gray-400 mb-4"></i>
-              <p class="text-gray-500 font-medium">Performance Chart</p>
-              <p class="text-sm text-gray-400">Chart visualization would appear here</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Performance Chart -->
+      <PerformanceChart />
     </div>
 
     <!-- Holdings Table -->
@@ -158,56 +145,56 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr
-              v-for="holding in sortedHoldings"
-              :key="holding.id"
+              v-for="investment in sortedHoldings"
+              :key="investment.id"
               class="hover:bg-gray-50 transition-colors"
             >
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
-                  <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center mr-3">
-                    <span class="text-primary-600 font-semibold text-sm">
-                      {{ holding.symbol }}
+                  <div class="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center mr-3">
+                    <span class="text-blue-700 font-semibold text-sm">
+                      {{ getFundSymbol(investment.fund?.name) }}
                     </span>
                   </div>
                   <div>
                     <div class="text-sm font-medium text-gray-900">
-                      {{ holding.name }}
+                      {{ investment.fund?.name }}
                     </div>
                     <div class="text-sm text-gray-500">
-                      {{ holding.description }}
+                      {{ investment.fund?.fundType }} • Vintage {{ investment.fund?.vintage }}
                     </div>
                   </div>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                  {{ holding.type }}
+                  {{ investment.fund?.fundType }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ formatDate(holding.investmentDate) }}
+                {{ formatDate(investment.investmentDate) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-semibold text-gray-900">
-                  {{ holding.currentValue }}
+                  {{ formatCurrency(investment.currentValue) }}
                 </div>
                 <div class="text-sm text-gray-500">
-                  Initial: {{ holding.initialValue }}
+                  Committed: {{ formatCurrency(investment.commitmentAmount) }}
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div :class="['flex items-center text-sm font-medium', holding.performanceColor]">
-                  <i :class="holding.performanceIcon" class="mr-1"></i>
-                  {{ holding.performance }}
+                <div :class="['flex items-center text-sm font-medium', getPerformanceColor(investment.irr)]">
+                  <i :class="getPerformanceIcon(investment.irr)" class="mr-1"></i>
+                  {{ formatPercentage(investment.irr || 0) }} IRR
                 </div>
                 <div class="text-sm text-gray-500">
-                  {{ holding.absoluteReturn }}
+                  {{ formatMultiple(investment.multiple || 0) }}x Multiple
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 <div class="flex items-center space-x-2">
                   <button
-                    @click="viewHoldingDetails(holding)"
+                    @click="viewHoldingDetails(investment)"
                     class="text-primary-600 hover:text-primary-700 font-medium"
                   >
                     View Details
@@ -259,62 +246,77 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { MockInvestmentApiService } from '../services/mockData'
+import PerformanceChart from '../components/charts/PerformanceChart.vue'
+import type { Investment, InvestmentSummary } from '../types/investment'
 
 const sortBy = ref('name')
+const isLoading = ref(true)
+const summary = ref<InvestmentSummary | null>(null)
+const investments = ref<Investment[]>([])
 
-const lastUpdated = ref(
-  new Intl.DateTimeFormat('en-US', {
+const lastUpdated = computed(() => {
+  return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
   }).format(new Date())
-)
+})
 
-const portfolioMetrics = ref([
-  {
-    title: 'Total Portfolio Value',
-    value: '$2,485,750',
-    change: '+12.5% YTD',
-    changeColor: 'text-success-600',
-    changeIcon: 'pi pi-arrow-up',
-    icon: 'pi pi-chart-line',
-    iconColor: 'text-primary-600',
-    iconBg: 'bg-primary-100'
-  },
-  {
-    title: 'Total Invested',
-    value: '$2,100,000',
-    change: '8 investments',
-    changeColor: 'text-gray-600',
-    changeIcon: 'pi pi-briefcase',
-    icon: 'pi pi-money-bill',
-    iconColor: 'text-success-600',
-    iconBg: 'bg-success-100'
-  },
-  {
-    title: 'Unrealized Gains',
-    value: '+$385,750',
-    change: '+18.4%',
-    changeColor: 'text-success-600',
-    changeIcon: 'pi pi-arrow-up',
-    icon: 'pi pi-trending-up',
-    iconColor: 'text-success-600',
-    iconBg: 'bg-success-100'
-  },
-  {
-    title: 'This Year Return',
-    value: '24.7%',
-    change: '+6.2% vs last year',
-    changeColor: 'text-success-600',
-    changeIcon: 'pi pi-arrow-up',
-    icon: 'pi pi-percentage',
-    iconColor: 'text-info-600',
-    iconBg: 'bg-info-100'
-  }
-])
+const portfolioMetrics = computed(() => {
+  if (!summary.value) return []
+
+  const unrealizedGains = summary.value.totalCurrentValue - summary.value.totalDrawn
+  const unrealizedGainsPercent = summary.value.totalDrawn > 0
+    ? unrealizedGains / summary.value.totalDrawn
+    : 0
+
+  return [
+    {
+      title: 'Total Portfolio Value',
+      value: formatCurrency(summary.value.totalCurrentValue),
+      change: `${formatPercentage(summary.value.overallIrr)} IRR`,
+      changeColor: summary.value.overallIrr >= 0 ? 'text-success-600' : 'text-error-600',
+      changeIcon: summary.value.overallIrr >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down',
+      icon: 'pi pi-chart-line',
+      iconColor: 'text-primary-600',
+      iconBg: 'bg-primary-100'
+    },
+    {
+      title: 'Total Committed',
+      value: formatCurrency(summary.value.totalCommitted),
+      change: `${summary.value.totalInvestments} investments`,
+      changeColor: 'text-gray-600',
+      changeIcon: 'pi pi-briefcase',
+      icon: 'pi pi-money-bill',
+      iconColor: 'text-success-600',
+      iconBg: 'bg-success-100'
+    },
+    {
+      title: 'Unrealized Gains',
+      value: formatCurrency(unrealizedGains),
+      change: formatPercentage(unrealizedGainsPercent),
+      changeColor: unrealizedGains >= 0 ? 'text-success-600' : 'text-error-600',
+      changeIcon: unrealizedGains >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down',
+      icon: 'pi pi-trending-up',
+      iconColor: 'text-success-600',
+      iconBg: 'bg-success-100'
+    },
+    {
+      title: 'Overall Multiple',
+      value: `${formatMultiple(summary.value.overallMultiple)}x`,
+      change: formatCurrency(summary.value.totalDistributed) + ' distributed',
+      changeColor: 'text-info-600',
+      changeIcon: 'pi pi-info-circle',
+      icon: 'pi pi-percentage',
+      iconColor: 'text-info-600',
+      iconBg: 'bg-info-100'
+    }
+  ]
+})
 
 const assetAllocations = ref([
   {
@@ -453,26 +455,28 @@ const recentActivity = ref([
 ])
 
 const sortedHoldings = computed(() => {
-  const sorted = [...holdings.value]
+  const sorted = [...investments.value]
 
   switch (sortBy.value) {
     case 'value':
-      return sorted.sort((a, b) => {
-        const aValue = parseFloat(a.currentValue.replace(/[$,]/g, ''))
-        const bValue = parseFloat(b.currentValue.replace(/[$,]/g, ''))
-        return bValue - aValue
-      })
+      return sorted.sort((a, b) => b.currentValue - a.currentValue)
     case 'performance':
-      return sorted.sort((a, b) => {
-        const aPerf = parseFloat(a.performance.replace(/[+%]/g, ''))
-        const bPerf = parseFloat(b.performance.replace(/[+%]/g, ''))
-        return bPerf - aPerf
-      })
+      return sorted.sort((a, b) => (b.irr || 0) - (a.irr || 0))
     case 'name':
     default:
-      return sorted.sort((a, b) => a.name.localeCompare(b.name))
+      return sorted.sort((a, b) => (a.fund?.name || '').localeCompare(b.fund?.name || ''))
   }
 })
+
+const getPerformanceColor = (irr?: number): string => {
+  if (!irr) return 'text-gray-500'
+  return irr >= 0 ? 'text-green-600' : 'text-red-600'
+}
+
+const getPerformanceIcon = (irr?: number): string => {
+  if (!irr) return 'pi pi-minus'
+  return irr >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'
+}
 
 const formatDate = (dateString: string) => {
   return new Intl.DateTimeFormat('en-US', {
@@ -482,8 +486,61 @@ const formatDate = (dateString: string) => {
   }).format(new Date(dateString))
 }
 
-const viewHoldingDetails = (holding: any) => {
-  // In a real app, this would navigate to a detailed view
-  console.log('Viewing holding details:', holding)
+// Utility functions
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount)
 }
+
+const formatPercentage = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  }).format(value)
+}
+
+const formatMultiple = (value: number): string => {
+  return value.toFixed(2)
+}
+
+const getFundSymbol = (fundName?: string): string => {
+  if (!fundName) return '??'
+  const words = fundName.split(' ')
+  if (words.length >= 2) {
+    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
+  }
+  return fundName.charAt(0).toUpperCase()
+}
+
+const viewHoldingDetails = (holding: Investment) => {
+  console.log('Viewing holding details:', holding)
+  // In a real app, this would navigate to a detailed view
+}
+
+// Data loading
+const loadPortfolioData = async () => {
+  try {
+    isLoading.value = true
+    const [summaryData, investmentsData] = await Promise.all([
+      MockInvestmentApiService.getInvestmentSummary(),
+      MockInvestmentApiService.getInvestments()
+    ])
+
+    summary.value = summaryData
+    investments.value = investmentsData
+  } catch (error) {
+    console.error('Failed to load portfolio data:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(async () => {
+  await loadPortfolioData()
+})
 </script>

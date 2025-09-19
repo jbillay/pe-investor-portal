@@ -40,7 +40,7 @@
                   Display Name
                 </label>
                 <input
-                  v-model="accountSettings.displayName"
+                  v-model="authStore.userFullName"
                   type="text"
                   class="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
@@ -304,8 +304,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useAuthStore } from '@stores/auth'
 
+const authStore = useAuthStore()
 const activeTab = ref('account')
 const isSaving = ref(false)
 
@@ -400,6 +402,16 @@ const themes = [
     color: 'text-gray-500'
   }
 ]
+
+// Initialize auth on mount
+onMounted(() => {
+  authStore.initializeAuth()
+
+  // If we have tokens but no user data, fetch current user
+  if (authStore.accessToken && !authStore.user) {
+    authStore.getCurrentUser()
+  }
+})
 
 const saveSettings = async () => {
   try {

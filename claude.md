@@ -1,7 +1,17 @@
 # Claude.md - Project Development Guide
 
 ## Project Overview
-This project is a multi-tenant enterprise application with secure document management and financial data handling capabilities. The architecture follows modern best practices with type safety, security, and scalability as core principles.
+The investor portal is a secure web application that gives fund investors direct access to information about their commitments, capital calls, distributions, reimbursements, and the fund’s overall activity.
+It also serves as a central repository for key documents such as fund regulations, subscription orders, audited financial statements, tax forms, legal agreements and amendments, investor notices, meeting minutes, and ESG or impact reports, providing controlled, encrypted access to all essential data and communications.
+
+Core functions should include
+- **Account access**: authentication, role-based permissions, multi-factor security.
+- **Capital activity**: view commitments, capital calls, distributions, unfunded amounts, transaction history, downloadable notices.
+- **Performance reporting**: net asset value, IRR, multiples, historical valuations, benchmark comparisons, downloadable statements.
+- **Documents**: central repository for fund regulations, subscription agreements and orders, audited financial statements, tax forms, legal agreements and amendments, investor notices, meeting minutes, and ESG or impact reports, with version control and search.
+- **Communications**: announcements, messaging, automated alerts for new documents or calls/distributions.
+- **Analytics and dashboards**: charts of portfolio composition, sector exposure, ESG metrics when offered.
+- **Data integration**: feeds from fund accounting, CRM, and reporting systems; export in Excel, CSV, PDF, or via API.
 
 ## Tech Stack Architecture
 

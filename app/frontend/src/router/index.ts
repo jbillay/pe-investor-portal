@@ -46,6 +46,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Portfolio' }
       },
       {
+        path: 'capital-activity',
+        name: 'capital-activity',
+        component: () => import('@views/CapitalActivityView.vue'),
+        meta: { title: 'Capital Activity' }
+      },
+      {
         path: 'settings',
         name: 'settings',
         component: () => import('@views/SettingsView.vue'),
@@ -56,6 +62,21 @@ const routes: RouteRecordRaw[] = [
         name: 'contact',
         component: () => import('@views/ContactView.vue'),
         meta: { title: 'Contact' }
+      },
+      {
+        path: 'communications',
+        name: 'communications',
+        component: () => import('@views/CommunicationsView.vue'),
+        meta: { title: 'Communications' }
+      },
+      {
+        path: 'admin',
+        name: 'admin',
+        component: () => import('@views/admin/UserRoleManagementView.vue'),
+        meta: {
+          title: 'Administration',
+          requiresRole: 'SUPER_ADMIN'
+        }
       }
     ]
   },
@@ -99,12 +120,6 @@ router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.meta.requiresAuth !== false
 
   if (requiresAuth) {
-    // Initialize auth state from localStorage if not already done
-    if (authStore.accessToken && !authStore.user) {
-      console.log('Initializing auth from localStorage...')
-      authStore.initializeAuth()
-    }
-
     // If still no user after initialization, try to fetch from API
     if (authStore.accessToken && !authStore.user) {
       console.log('Has token but no user, fetching current user...')
@@ -136,6 +151,22 @@ router.beforeEach(async (to, from, next) => {
         query: { redirect: to.fullPath }
       })
       return
+    }
+
+    // Check role-based access control
+    if (to.meta.requiresRole) {
+      const userRoles = authStore.user?.roles || []
+      const requiredRole = to.meta.requiresRole as string
+
+      if (!userRoles.includes(requiredRole)) {
+        console.log(`Access denied: User does not have required role ${requiredRole}`)
+        // Redirect to dashboard with error message
+        next({
+          name: 'dashboard',
+          query: { error: 'insufficient_permissions' }
+        })
+        return
+      }
     }
   } else {
     // If user is authenticated and trying to access login page, redirect to dashboard

@@ -144,28 +144,74 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       isLoading.value = true
       console.log('Fetching current user...')
-      const response = await apiClient.get<User>('/auth/profile')
-      console.log('getCurrentUser API response:', response)
 
-      // Handle both wrapped and direct response formats
+      // Fetch basic user profile
+      const profileResponse = await apiClient.get<User>('/auth/profile')
+      console.log('getCurrentUser API response:', profileResponse)
+
+      // Handle both wrapped and direct response formats for profile
       let userData: User
 
-      if (response.status === 'success' && response.data) {
+      if (profileResponse.status === 'success' && profileResponse.data) {
         // Wrapped format
-        userData = response.data
+        userData = profileResponse.data
         console.log('Using wrapped format for getCurrentUser')
-      } else if ((response as any).id && (response as any).email) {
+      } else if ((profileResponse as any).id && (profileResponse as any).email) {
         // Direct format (user object directly)
-        userData = response as any
+        userData = profileResponse as any
         console.log('Using direct format for getCurrentUser')
       } else {
-        console.error('getCurrentUser response format unexpected:', response)
+        console.error('getCurrentUser response format unexpected:', profileResponse)
         throw new Error('Invalid getCurrentUser response format')
+      }
+
+      // Fetch user roles and permissions
+      try {
+        console.log('Fetching user roles and permissions...')
+        const rolesResponse = await apiClient.get('admin/roles/me/roles')
+        console.log('User roles API response:', rolesResponse)
+
+        // Handle both wrapped and direct response formats for roles
+        let rolesData: any
+
+        if (rolesResponse.status === 'success' && rolesResponse.data) {
+          // Wrapped format
+          rolesData = rolesResponse.data
+        } else if ((rolesResponse as any).roles) {
+          // Direct format
+          rolesData = rolesResponse as any
+        } else {
+          console.warn('No roles data found in response, using empty roles')
+          rolesData = { roles: [], permissions: [] }
+        }
+
+        // Extract role names and permissions
+        const roles = rolesData.roles?.map((role: any) => role.name || role) || []
+        const permissions = rolesData.permissions?.map((perm: any) => perm.name || perm) || []
+
+        // Merge user data with roles and permissions
+        userData = {
+          ...userData,
+          roles,
+          permissions
+        }
+
+        console.log('User roles and permissions:', { roles, permissions })
+
+      } catch (rolesError: any) {
+        console.warn('Failed to fetch user roles, continuing without roles:', rolesError)
+        // Continue with basic user data even if roles fetch fails
+        userData = {
+          ...userData,
+          roles: [],
+          permissions: []
+        }
       }
 
       user.value = userData
       localStorage.setItem('user', JSON.stringify(userData))
-      console.log('User data updated:', userData)
+      console.log('User data updated with roles:', userData)
+
     } catch (err: any) {
       console.error('getCurrentUser API error:', err)
       error.value = err.response?.data?.message || 'Failed to get user data'
@@ -211,6 +257,7 @@ export const useAuthStore = defineStore('auth', () => {
         console.log('Auth initialized from localStorage:', {
           userId: parsedUser.id,
           email: parsedUser.email,
+          roles: parsedUser.roles,
           isAuthenticated: isAuthenticated.value
         })
       } catch (err) {
@@ -220,6 +267,59 @@ export const useAuthStore = defineStore('auth', () => {
     } else {
       console.log('No stored user data or access token found')
     }
+  }
+
+  // Refresh user roles and permissions only
+  async function refreshUserRoles(): Promise<void> {
+    if (!accessToken.value || !user.value) return
+
+    try {
+      console.log('Refreshing user roles and permissions...')
+      const rolesResponse = await apiClient.get('/roles/me/roles')
+      console.log('User roles refresh response:', rolesResponse)
+
+      // Handle both wrapped and direct response formats for roles
+      let rolesData: any
+
+      if (rolesResponse.status === 'success' && rolesResponse.data) {
+        // Wrapped format
+        rolesData = rolesResponse.data
+      } else if ((rolesResponse as any).roles) {
+        // Direct format
+        rolesData = rolesResponse as any
+      } else {
+        console.warn('No roles data found in response, using empty roles')
+        rolesData = { roles: [], permissions: [] }
+      }
+
+      // Extract role names and permissions
+      const roles = rolesData.roles?.map((role: any) => role.name || role) || []
+      const permissions = rolesData.permissions?.map((perm: any) => perm.name || perm) || []
+
+      // Update user data with new roles and permissions
+      user.value = {
+        ...user.value,
+        roles,
+        permissions
+      }
+
+      localStorage.setItem('user', JSON.stringify(user.value))
+      console.log('User roles refreshed:', { roles, permissions })
+
+    } catch (rolesError: any) {
+      console.warn('Failed to refresh user roles:', rolesError)
+      // Don't throw error, just log it
+    }
+  }
+
+  // Check if user has a specific role
+  function hasRole(roleName: string): boolean {
+    return user.value?.roles?.includes(roleName) || false
+  }
+
+  // Check if user has a specific permission
+  function hasPermission(permissionName: string): boolean {
+    return user.value?.permissions?.includes(permissionName) || false
   }
 
   // Clear any auth errors
@@ -247,6 +347,9 @@ export const useAuthStore = defineStore('auth', () => {
     getCurrentUser,
     updateProfile,
     initializeAuth,
+    refreshUserRoles,
+    hasRole,
+    hasPermission,
     clearError
   }
 })

@@ -16,7 +16,6 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiUnauthorizedResponse,
-  ApiBadRequestResponse,
   ApiTooManyRequestsResponse,
   ApiConflictResponse,
 } from '@nestjs/swagger';

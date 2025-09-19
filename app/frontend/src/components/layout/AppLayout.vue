@@ -3,8 +3,13 @@
     <!-- Header -->
     <AppHeader />
 
+    <!-- Navigation -->
+    <div class="pt-16">
+      <AppNavigation />
+    </div>
+
     <!-- Main Content -->
-    <main class="pt-16">
+    <main class="pt-2">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <router-view />
       </div>
@@ -94,6 +99,7 @@
 import { ref, onMounted, watch, provide } from 'vue'
 import { useAuthStore } from '@stores/auth'
 import AppHeader from './AppHeader.vue'
+import AppNavigation from './AppNavigation.vue'
 
 const authStore = useAuthStore()
 

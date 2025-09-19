@@ -120,9 +120,23 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-start justify-between">
                 <div class="flex-1">
-                  <h3 class="text-sm font-semibold text-gray-900 mb-1">
-                    {{ document.name }}
-                  </h3>
+                  <div class="flex items-center gap-2 mb-1">
+                    <h3 class="text-sm font-semibold text-gray-900">
+                      {{ document.title }}
+                    </h3>
+                    <span
+                      v-if="document.isConfidential"
+                      :class="[
+                        'px-2 py-1 text-xs font-medium rounded-full',
+                        document.confidentialityLevel === 'HIGHLY_CONFIDENTIAL' ? 'bg-red-100 text-red-700' :
+                        document.confidentialityLevel === 'CONFIDENTIAL' ? 'bg-orange-100 text-orange-700' :
+                        document.confidentialityLevel === 'RESTRICTED' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-gray-100 text-gray-700'
+                      ]"
+                    >
+                      {{ document.confidentialityLevel }}
+                    </span>
+                  </div>
                   <p class="text-sm text-gray-600 mb-2">
                     {{ document.description }}
                   </p>
@@ -145,6 +159,7 @@
                 <!-- Actions -->
                 <div class="flex items-center space-x-2 ml-4">
                   <button
+                    v-if="document.canView"
                     @click="viewDocument(document)"
                     class="p-2 text-gray-400 hover:text-gray-600 focus:outline-none"
                     title="View"
@@ -152,6 +167,7 @@
                     <i class="pi pi-eye"></i>
                   </button>
                   <button
+                    v-if="document.canDownload"
                     @click="downloadDocument(document)"
                     class="p-2 text-gray-400 hover:text-gray-600 focus:outline-none"
                     title="Download"
@@ -159,12 +175,20 @@
                     <i class="pi pi-download"></i>
                   </button>
                   <button
+                    v-if="document.canShare"
                     @click="shareDocument(document)"
                     class="p-2 text-gray-400 hover:text-gray-600 focus:outline-none"
                     title="Share"
                   >
                     <i class="pi pi-share-alt"></i>
                   </button>
+                  <div
+                    v-if="!document.canView && !document.canDownload && !document.canShare"
+                    class="flex items-center text-gray-400"
+                    title="Access Restricted"
+                  >
+                    <i class="pi pi-lock"></i>
+                  </div>
                 </div>
               </div>
             </div>
@@ -187,9 +211,23 @@
             </div>
 
             <!-- Document Info -->
-            <h3 class="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">
-              {{ document.name }}
-            </h3>
+            <div class="flex items-start justify-between mb-2">
+              <h3 class="font-semibold text-gray-900 text-sm line-clamp-2 flex-1">
+                {{ document.title }}
+              </h3>
+              <span
+                v-if="document.isConfidential"
+                :class="[
+                  'px-1 py-0.5 text-xs font-medium rounded ml-2 flex-shrink-0',
+                  document.confidentialityLevel === 'HIGHLY_CONFIDENTIAL' ? 'bg-red-100 text-red-700' :
+                  document.confidentialityLevel === 'CONFIDENTIAL' ? 'bg-orange-100 text-orange-700' :
+                  document.confidentialityLevel === 'RESTRICTED' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-700'
+                ]"
+              >
+                {{ document.confidentialityLevel.split('_')[0] }}
+              </span>
+            </div>
             <p class="text-xs text-gray-600 mb-3 line-clamp-2">
               {{ document.description }}
             </p>
@@ -209,6 +247,7 @@
             <!-- Actions -->
             <div class="flex items-center justify-end space-x-1 mt-3 pt-3 border-t border-gray-100">
               <button
+                v-if="document.canDownload"
                 @click.stop="downloadDocument(document)"
                 class="p-1 text-gray-400 hover:text-gray-600 focus:outline-none"
                 title="Download"
@@ -216,12 +255,20 @@
                 <i class="pi pi-download"></i>
               </button>
               <button
+                v-if="document.canShare"
                 @click.stop="shareDocument(document)"
                 class="p-1 text-gray-400 hover:text-gray-600 focus:outline-none"
                 title="Share"
               >
                 <i class="pi pi-share-alt"></i>
               </button>
+              <div
+                v-if="!document.canDownload && !document.canShare"
+                class="flex items-center text-gray-400"
+                title="Access Restricted"
+              >
+                <i class="pi pi-lock text-sm"></i>
+              </div>
             </div>
           </div>
         </div>
@@ -285,7 +332,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
+import type { Document } from '@/types/investment'
 
 const searchQuery = ref('')
 const selectedCategory = ref('')
@@ -294,11 +342,28 @@ const viewMode = ref<'list' | 'grid'>('list')
 const currentPage = ref(1)
 const documentsPerPage = ref(10)
 
-// Mock documents data
-const documents = ref([
+// Enhanced document interface with security features
+interface EnhancedDocument extends Document {
+  category: string
+  type: string
+  size: string
+  icon: string
+  iconColor: string
+  iconBg: string
+  confidentialityLevel: 'PUBLIC' | 'RESTRICTED' | 'CONFIDENTIAL' | 'HIGHLY_CONFIDENTIAL'
+  canView: boolean
+  canDownload: boolean
+  canShare: boolean
+}
+
+const addNotification = inject('addNotification') as Function
+
+// Mock enhanced documents data with security metadata
+const documents = ref<EnhancedDocument[]>([
   {
-    id: 1,
-    name: 'Q3 2024 Financial Report.pdf',
+    id: '1',
+    fundId: 'fund-1',
+    title: 'Q3 2024 Financial Report.pdf',
     description: 'Quarterly financial performance report for all portfolio companies',
     category: 'financial',
     type: 'pdf',
@@ -306,12 +371,27 @@ const documents = ref([
     uploadedAt: '2024-10-15T10:30:00Z',
     uploadedBy: 'John Smith',
     icon: 'pi pi-file-pdf',
-    iconColor: 'text-error-600',
-    iconBg: 'bg-error-100'
+    iconColor: 'text-red-600',
+    iconBg: 'bg-red-100',
+    documentType: 'QUARTERLY_REPORT',
+    fileName: 'Q3_2024_Financial_Report.pdf',
+    filePath: '/documents/quarterly-reports/q3-2024.pdf',
+    fileSize: 2457600,
+    mimeType: 'application/pdf',
+    version: '1.0',
+    isConfidential: true,
+    accessLevel: 'INVESTOR',
+    confidentialityLevel: 'CONFIDENTIAL',
+    canView: true,
+    canDownload: true,
+    canShare: false,
+    createdAt: '2024-10-15T10:30:00Z',
+    updatedAt: '2024-10-15T10:30:00Z'
   },
   {
-    id: 2,
-    name: 'Investment Agreement - Healthcare Fund.docx',
+    id: '2',
+    fundId: 'fund-2',
+    title: 'Investment Agreement - Healthcare Fund.docx',
     description: 'Legal investment agreement documentation',
     category: 'legal',
     type: 'word',
@@ -319,12 +399,27 @@ const documents = ref([
     uploadedAt: '2024-10-12T14:20:00Z',
     uploadedBy: 'Sarah Johnson',
     icon: 'pi pi-file-word',
-    iconColor: 'text-info-600',
-    iconBg: 'bg-info-100'
+    iconColor: 'text-blue-600',
+    iconBg: 'bg-blue-100',
+    documentType: 'LEGAL_AGREEMENT',
+    fileName: 'Healthcare_Fund_Investment_Agreement.docx',
+    filePath: '/documents/legal/healthcare-agreement.docx',
+    fileSize: 1887437,
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    version: '2.1',
+    isConfidential: true,
+    accessLevel: 'INVESTOR',
+    confidentialityLevel: 'HIGHLY_CONFIDENTIAL',
+    canView: true,
+    canDownload: false,
+    canShare: false,
+    createdAt: '2024-10-12T14:20:00Z',
+    updatedAt: '2024-10-12T14:20:00Z'
   },
   {
-    id: 3,
-    name: 'Portfolio Analysis Q3.xlsx',
+    id: '3',
+    fundId: 'fund-1',
+    title: 'Portfolio Analysis Q3.xlsx',
     description: 'Detailed portfolio performance analysis and metrics',
     category: 'financial',
     type: 'excel',
@@ -332,12 +427,27 @@ const documents = ref([
     uploadedAt: '2024-10-10T09:15:00Z',
     uploadedBy: 'Michael Chen',
     icon: 'pi pi-file-excel',
-    iconColor: 'text-success-600',
-    iconBg: 'bg-success-100'
+    iconColor: 'text-green-600',
+    iconBg: 'bg-green-100',
+    documentType: 'FINANCIAL_STATEMENT',
+    fileName: 'Portfolio_Analysis_Q3_2024.xlsx',
+    filePath: '/documents/analysis/q3-portfolio.xlsx',
+    fileSize: 3355443,
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    version: '1.0',
+    isConfidential: false,
+    accessLevel: 'INVESTOR',
+    confidentialityLevel: 'RESTRICTED',
+    canView: true,
+    canDownload: true,
+    canShare: true,
+    createdAt: '2024-10-10T09:15:00Z',
+    updatedAt: '2024-10-10T09:15:00Z'
   },
   {
-    id: 4,
-    name: 'Compliance Report 2024.pdf',
+    id: '4',
+    fundId: 'fund-1',
+    title: 'Compliance Report 2024.pdf',
     description: 'Annual compliance and regulatory reporting',
     category: 'compliance',
     type: 'pdf',
@@ -345,12 +455,27 @@ const documents = ref([
     uploadedAt: '2024-10-08T16:45:00Z',
     uploadedBy: 'Emily Davis',
     icon: 'pi pi-file-pdf',
-    iconColor: 'text-error-600',
-    iconBg: 'bg-error-100'
+    iconColor: 'text-red-600',
+    iconBg: 'bg-red-100',
+    documentType: 'ANNUAL_REPORT',
+    fileName: 'Compliance_Report_2024.pdf',
+    filePath: '/documents/compliance/annual-2024.pdf',
+    fileSize: 1153433,
+    mimeType: 'application/pdf',
+    version: '1.0',
+    isConfidential: false,
+    accessLevel: 'PUBLIC',
+    confidentialityLevel: 'PUBLIC',
+    canView: true,
+    canDownload: true,
+    canShare: true,
+    createdAt: '2024-10-08T16:45:00Z',
+    updatedAt: '2024-10-08T16:45:00Z'
   },
   {
-    id: 5,
-    name: 'Investment Strategy Presentation.pptx',
+    id: '5',
+    fundId: 'fund-2',
+    title: 'Investment Strategy Presentation.pptx',
     description: 'Strategic overview and investment approach presentation',
     category: 'operational',
     type: 'powerpoint',
@@ -358,8 +483,22 @@ const documents = ref([
     uploadedAt: '2024-10-05T11:30:00Z',
     uploadedBy: 'David Wilson',
     icon: 'pi pi-file',
-    iconColor: 'text-warning-600',
-    iconBg: 'bg-warning-100'
+    iconColor: 'text-orange-600',
+    iconBg: 'bg-orange-100',
+    documentType: 'QUARTERLY_REPORT',
+    fileName: 'Investment_Strategy_Presentation.pptx',
+    filePath: '/documents/strategy/investment-strategy.pptx',
+    fileSize: 5872640,
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    version: '1.3',
+    isConfidential: true,
+    accessLevel: 'INVESTOR',
+    confidentialityLevel: 'CONFIDENTIAL',
+    canView: true,
+    canDownload: true,
+    canShare: false,
+    createdAt: '2024-10-05T11:30:00Z',
+    updatedAt: '2024-10-05T11:30:00Z'
   }
 ])
 
@@ -393,23 +532,86 @@ const formatDate = (dateString: string) => {
 }
 
 const uploadDocument = () => {
-  // In a real app, this would open a file upload dialog
-  console.log('Upload document triggered')
+  addNotification({
+    type: 'info',
+    title: 'Upload Document',
+    message: 'Document upload functionality will be available soon.'
+  })
 }
 
-const viewDocument = (document: any) => {
-  // In a real app, this would open the document viewer
-  console.log('Viewing document:', document)
+const viewDocument = (document: EnhancedDocument) => {
+  if (!document.canView) {
+    addNotification({
+      type: 'warning',
+      title: 'Access Denied',
+      message: 'You do not have permission to view this document.'
+    })
+    return
+  }
+
+  // Log access for audit trail
+  console.log('Document accessed:', {
+    documentId: document.id,
+    title: document.title,
+    confidentialityLevel: document.confidentialityLevel,
+    timestamp: new Date().toISOString()
+  })
+
+  addNotification({
+    type: 'info',
+    title: 'Opening Document',
+    message: `Opening ${document.title} in secure viewer...`
+  })
 }
 
-const downloadDocument = (document: any) => {
-  // In a real app, this would trigger a download
-  console.log('Downloading document:', document)
+const downloadDocument = (document: EnhancedDocument) => {
+  if (!document.canDownload) {
+    addNotification({
+      type: 'error',
+      title: 'Download Restricted',
+      message: 'You do not have permission to download this document.'
+    })
+    return
+  }
+
+  if (document.isConfidential) {
+    addNotification({
+      type: 'warning',
+      title: 'Confidential Document',
+      message: `This is a ${document.confidentialityLevel} document. Handle with care.`
+    })
+  }
+
+  // Log download for audit trail
+  console.log('Document downloaded:', {
+    documentId: document.id,
+    title: document.title,
+    fileSize: document.fileSize,
+    timestamp: new Date().toISOString()
+  })
+
+  addNotification({
+    type: 'success',
+    title: 'Download Started',
+    message: `${document.title} download initiated.`
+  })
 }
 
-const shareDocument = (document: any) => {
-  // In a real app, this would open a share dialog
-  console.log('Sharing document:', document)
+const shareDocument = (document: EnhancedDocument) => {
+  if (!document.canShare) {
+    addNotification({
+      type: 'error',
+      title: 'Sharing Restricted',
+      message: 'This document cannot be shared due to security policies.'
+    })
+    return
+  }
+
+  addNotification({
+    type: 'info',
+    title: 'Share Document',
+    message: 'Secure sharing options will be available soon.'
+  })
 }
 </script>
 

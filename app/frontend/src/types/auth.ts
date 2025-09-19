@@ -10,6 +10,8 @@ export interface User {
   createdAt: string
   updatedAt: string
   avatar?: string
+  roles?: string[]
+  permissions?: string[]
 }
 
 export interface LoginCredentials {

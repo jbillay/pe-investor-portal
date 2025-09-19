@@ -28,9 +28,10 @@ model User {
   updatedAt  DateTime  @updatedAt
 
   // Relations
-  sessions   Session[]
-  profile    UserProfile?
-  userRoles  UserRole[]
+  sessions    Session[]
+  profile     UserProfile?
+  userRoles   UserRole[]
+  investments Investment[]
 
   @@map("users")
 }
@@ -185,4 +186,260 @@ model RoleAssignment {
   @@index([expiresAt])
   @@index([isActive])
   @@map("role_assignments")
+}
+
+// Fund model - represents investment funds
+model Fund {
+  id             String    @id @default(cuid())
+  name           String    @unique
+  description    String?
+  fundType       String    // PE, VC, GROWTH, REAL_ESTATE, etc.
+  vintage        Int       // Year the fund was established
+  targetSize     Decimal   @db.Decimal(15,2) // Target fund size
+  commitedSize   Decimal   @db.Decimal(15,2) // Total committed capital
+  drawnSize      Decimal   @db.Decimal(15,2) @default(0) // Capital drawn down
+  currency       String    @default("USD")
+  status         String    @default("ACTIVE") // ACTIVE, CLOSED, LIQUIDATED
+  closeDate      DateTime? // Fund closing date
+  finalClose     DateTime? // Final closing date
+  liquidationDate DateTime? // Expected liquidation date
+  managementFee  Decimal?  @db.Decimal(5,4) // Management fee percentage
+  carriedInterest Decimal? @db.Decimal(5,4) // Carried interest percentage
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  investments    Investment[]
+  capitalCalls   CapitalCall[]
+  distributions  Distribution[]
+  documents      Document[]
+  valuations     Valuation[]
+  communications Communication[]
+
+  @@index([fundType])
+  @@index([vintage])
+  @@index([status])
+  @@map("funds")
+}
+
+// Investment model - investor's commitment to a fund
+model Investment {
+  id               String    @id @default(cuid())
+  userId           String    // Investor user ID
+  fundId           String
+  commitmentAmount Decimal   @db.Decimal(15,2) // Original commitment
+  drawnAmount      Decimal   @db.Decimal(15,2) @default(0) // Amount drawn down
+  distributedAmount Decimal  @db.Decimal(15,2) @default(0) // Amount distributed
+  currentValue     Decimal   @db.Decimal(15,2) @default(0) // Current NAV
+  irr              Decimal?  @db.Decimal(8,4) // Internal Rate of Return
+  multiple         Decimal?  @db.Decimal(8,4) // Multiple of Invested Capital
+  status           String    @default("ACTIVE") // ACTIVE, EXITED, DEFAULTED
+  investmentDate   DateTime
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fund           Fund            @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  capitalCalls   CapitalCallInvestor[]
+  distributions  DistributionInvestor[]
+
+  @@unique([userId, fundId])
+  @@index([userId])
+  @@index([fundId])
+  @@index([status])
+  @@map("investments")
+}
+
+// Capital Call model
+model CapitalCall {
+  id              String    @id @default(cuid())
+  fundId          String
+  callNumber      Int       // Sequential call number for the fund
+  totalAmount     Decimal   @db.Decimal(15,2) // Total amount being called
+  purpose         String    // Purpose of the capital call
+  callDate        DateTime  // Date of the call
+  dueDate         DateTime  // Payment due date
+  settlementDate  DateTime? // Actual settlement date
+  status          String    @default("PENDING") // PENDING, FUNDED, OVERDUE, CANCELLED
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  fund            Fund                    @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  investors       CapitalCallInvestor[]
+  documents       Document[]
+
+  @@unique([fundId, callNumber])
+  @@index([fundId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("capital_calls")
+}
+
+// Capital Call per Investor
+model CapitalCallInvestor {
+  id             String    @id @default(cuid())
+  capitalCallId  String
+  investmentId   String
+  amountCalled   Decimal   @db.Decimal(15,2)
+  amountPaid     Decimal   @db.Decimal(15,2) @default(0)
+  paymentDate    DateTime?
+  status         String    @default("PENDING") // PENDING, PAID, OVERDUE, DEFAULTED
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  capitalCall    CapitalCall @relation(fields: [capitalCallId], references: [id], onDelete: Cascade)
+  investment     Investment  @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+
+  @@unique([capitalCallId, investmentId])
+  @@index([capitalCallId])
+  @@index([investmentId])
+  @@index([status])
+  @@map("capital_call_investors")
+}
+
+// Distribution model
+model Distribution {
+  id                String    @id @default(cuid())
+  fundId            String
+  distributionNumber Int      // Sequential distribution number for the fund
+  totalAmount       Decimal   @db.Decimal(15,2) // Total amount being distributed
+  distributionType  String    // RETURN_OF_CAPITAL, CAPITAL_GAIN, INCOME, etc.
+  recordDate        DateTime  // Record date for distribution
+  paymentDate       DateTime  // Payment date
+  exDividendDate    DateTime? // Ex-dividend date
+  description       String?   // Description of distribution
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  fund              Fund                      @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  investors         DistributionInvestor[]
+  documents         Document[]
+
+  @@unique([fundId, distributionNumber])
+  @@index([fundId])
+  @@index([paymentDate])
+  @@map("distributions")
+}
+
+// Distribution per Investor
+model DistributionInvestor {
+  id             String    @id @default(cuid())
+  distributionId String
+  investmentId   String
+  amount         Decimal   @db.Decimal(15,2)
+  taxWithholding Decimal?  @db.Decimal(15,2) // Tax withholding amount
+  netAmount      Decimal   @db.Decimal(15,2) // Net amount after taxes
+  paymentDate    DateTime?
+  status         String    @default("PENDING") // PENDING, PAID
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  distribution   Distribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  investment     Investment   @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+
+  @@unique([distributionId, investmentId])
+  @@index([distributionId])
+  @@index([investmentId])
+  @@index([status])
+  @@map("distribution_investors")
+}
+
+// Document model for fund documents
+model Document {
+  id            String    @id @default(cuid())
+  fundId        String?   // Optional - some documents may not be fund-specific
+  capitalCallId String?   // Link to capital call if applicable
+  distributionId String?  // Link to distribution if applicable
+  title         String
+  description   String?
+  documentType  String    // FINANCIAL_STATEMENT, TAX_FORM, LEGAL_AGREEMENT, etc.
+  fileName      String
+  filePath      String    // Secure file path/URL
+  fileSize      Int       // File size in bytes
+  mimeType      String    // MIME type
+  version       String    @default("1.0") // Document version
+  isConfidential Boolean  @default(true)
+  accessLevel   String    @default("INVESTOR") // PUBLIC, INVESTOR, ADMIN
+  uploadedBy    String    // User ID who uploaded
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  fund          Fund?         @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  capitalCall   CapitalCall?  @relation(fields: [capitalCallId], references: [id], onDelete: Cascade)
+  distribution  Distribution? @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+
+  @@index([fundId])
+  @@index([documentType])
+  @@index([accessLevel])
+  @@index([uploadedBy])
+  @@map("documents")
+}
+
+// Valuation model for fund performance tracking
+model Valuation {
+  id              String   @id @default(cuid())
+  fundId          String
+  valuationDate   DateTime // Date of valuation
+  totalValue      Decimal  @db.Decimal(15,2) // Total fund NAV
+  sharePrice      Decimal? @db.Decimal(10,4) // Price per share/unit
+  irr             Decimal? @db.Decimal(8,4) // Fund IRR
+  multiple        Decimal? @db.Decimal(8,4) // Fund multiple
+  unrealizedValue Decimal? @db.Decimal(15,2) // Unrealized value
+  realizedValue   Decimal? @db.Decimal(15,2) // Realized value
+  totalCommitted  Decimal? @db.Decimal(15,2) // Total committed capital
+  totalDrawn      Decimal? @db.Decimal(15,2) // Total drawn capital
+  totalDistributed Decimal? @db.Decimal(15,2) // Total distributed
+  benchmark       String?  // Benchmark comparison
+  benchmarkReturn Decimal? @db.Decimal(8,4) // Benchmark return
+  notes           String?  // Valuation notes
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  fund            Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  @@unique([fundId, valuationDate])
+  @@index([fundId])
+  @@index([valuationDate])
+  @@map("valuations")
+}
+
+// Communication model for announcements and messages
+model Communication {
+  id          String    @id @default(cuid())
+  fundId      String?   // Optional - some communications may not be fund-specific
+  title       String
+  content     String    // Message content
+  type        String    // ANNOUNCEMENT, ALERT, NEWSLETTER, etc.
+  priority    String    @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  targetAudience String @default("ALL") // ALL, INVESTORS, ADMINS, SPECIFIC
+  isGlobal    Boolean   @default(false) // Global to all users vs fund-specific
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  status      String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  publishedBy String    // User ID who published
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  fund        Fund?     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  @@index([fundId])
+  @@index([type])
+  @@index([status])
+  @@index([publishedAt])
+  @@map("communications")
 }
