@@ -63,9 +63,9 @@ async function bootstrap() {
     )
     .addTag('Authentication', 'User authentication and session management')
     .addTag('Role Management', 'Role-based access control operations')
+    .addTag('RBAC Setup', 'Initiate the role & permission - to be used only once')
     .addTag('Permission Management', 'Permission management and assignment')
     .addTag('Health', 'Health check endpoints')
-    .addTag('Users', 'User management operations')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -96,10 +96,19 @@ async function bootstrap() {
     `🔐 Auth endpoints available at: http://localhost:${port}/api/auth`,
   );
   logger.log(
-    `👑 Role management endpoints available at: http://localhost:${port}/api/roles`,
+    `👤 User management endpoints available at: http://localhost:${port}/api/admin/users`,
   );
   logger.log(
-    `🔒 Permission management endpoints available at: http://localhost:${port}/api/permissions`,
+    `👑 Role management endpoints available at: http://localhost:${port}/api/admin/roles`,
+  );
+  logger.log(
+    `🔒 Permission management endpoints available at: http://localhost:${port}/api/admin/permissions`,
+  );
+  logger.log(
+    `⚙️ RBAC setup endpoints available at: http://localhost:${port}/api/admin/rbac-setup`,
+  );
+  logger.log(
+    `🔗 User role management endpoints available at: http://localhost:${port}/api/admin/user-roles`,
   );
   logger.log(
     `📚 API documentation available at: http://localhost:${port}/api-docs`,

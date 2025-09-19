@@ -10,77 +10,14 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
-// Enums for predefined permissions
-export enum PermissionName {
-  // User Management
-  CREATE_USER = 'CREATE_USER',
-  VIEW_USER = 'VIEW_USER',
-  UPDATE_USER = 'UPDATE_USER',
-  DELETE_USER = 'DELETE_USER',
-
-  // Role Management
-  CREATE_ROLE = 'CREATE_ROLE',
-  VIEW_ROLE = 'VIEW_ROLE',
-  UPDATE_ROLE = 'UPDATE_ROLE',
-  DELETE_ROLE = 'DELETE_ROLE',
-  ASSIGN_ROLE = 'ASSIGN_ROLE',
-  REVOKE_ROLE = 'REVOKE_ROLE',
-
-  // Permission Management
-  CREATE_PERMISSION = 'CREATE_PERMISSION',
-  VIEW_PERMISSION = 'VIEW_PERMISSION',
-  UPDATE_PERMISSION = 'UPDATE_PERMISSION',
-  DELETE_PERMISSION = 'DELETE_PERMISSION',
-
-  // Dashboard Access
-  VIEW_ADMIN_DASHBOARD = 'VIEW_ADMIN_DASHBOARD',
-  VIEW_INVESTOR_DASHBOARD = 'VIEW_INVESTOR_DASHBOARD',
-  VIEW_USER_DASHBOARD = 'VIEW_USER_DASHBOARD',
-
-  // Portfolio Management
-  CREATE_PORTFOLIO = 'CREATE_PORTFOLIO',
-  VIEW_PORTFOLIO = 'VIEW_PORTFOLIO',
-  UPDATE_PORTFOLIO = 'UPDATE_PORTFOLIO',
-  DELETE_PORTFOLIO = 'DELETE_PORTFOLIO',
-
-  // System Management
-  VIEW_AUDIT_LOGS = 'VIEW_AUDIT_LOGS',
-  MANAGE_SYSTEM_SETTINGS = 'MANAGE_SYSTEM_SETTINGS',
-  VIEW_SYSTEM_METRICS = 'VIEW_SYSTEM_METRICS',
-}
-
-// Resource types for permissions
-export enum ResourceType {
-  USER = 'USER',
-  ROLE = 'ROLE',
-  PERMISSION = 'PERMISSION',
-  PORTFOLIO = 'PORTFOLIO',
-  DASHBOARD = 'DASHBOARD',
-  SYSTEM = 'SYSTEM',
-  AUDIT = 'AUDIT',
-}
-
-// Action types for permissions
-export enum ActionType {
-  CREATE = 'CREATE',
-  READ = 'READ',
-  UPDATE = 'UPDATE',
-  DELETE = 'DELETE',
-  ASSIGN = 'ASSIGN',
-  REVOKE = 'REVOKE',
-  MANAGE = 'MANAGE',
-}
-
 // Create Permission DTO
 export class CreatePermissionDto {
   @ApiProperty({
     description: 'Permission name',
     example: 'VIEW_PORTFOLIO',
-    enum: PermissionName,
   })
-  @IsEnum(PermissionName)
   @IsNotEmpty()
-  name: PermissionName;
+  name: string;
 
   @ApiPropertyOptional({
     description: 'Permission description',
@@ -92,21 +29,17 @@ export class CreatePermissionDto {
 
   @ApiPropertyOptional({
     description: 'Resource this permission applies to',
-    example: 'PORTFOLIO',
-    enum: ResourceType,
+    example: 'PORTFOLIO'
   })
-  @IsEnum(ResourceType)
   @IsOptional()
-  resource?: ResourceType;
+  resource?: string;
 
   @ApiPropertyOptional({
     description: 'Action this permission allows',
     example: 'READ',
-    enum: ActionType,
   })
-  @IsEnum(ActionType)
   @IsOptional()
-  action?: ActionType;
+  action?: string;
 
   @ApiPropertyOptional({
     description: 'Whether this permission is active',
@@ -282,21 +215,17 @@ export class RoleWithPermissionsResponseDto {
 export class CheckPermissionDto {
   @ApiProperty({
     description: 'Permission name to check',
-    example: 'VIEW_PORTFOLIO',
-    enum: PermissionName,
+    example: 'VIEW_PORTFOLIO'
   })
-  @IsEnum(PermissionName)
   @IsNotEmpty()
-  permission: PermissionName;
+  permission: string;
 
   @ApiPropertyOptional({
     description: 'Resource to check permission for',
     example: 'PORTFOLIO',
-    enum: ResourceType,
   })
-  @IsEnum(ResourceType)
   @IsOptional()
-  resource?: ResourceType;
+  resource?: string;
 
   @ApiPropertyOptional({
     description: 'Specific resource ID to check permission for',

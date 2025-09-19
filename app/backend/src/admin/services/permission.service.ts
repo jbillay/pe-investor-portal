@@ -18,7 +18,7 @@ import {
   PermissionCheckResponseDto,
   UserPermissionsResponseDto,
 } from '../dto/permission.dto';
-import { PermissionContext } from '../interfaces/auth.interface';
+import { PermissionContext } from '../../auth/interfaces/auth.interface';
 
 @Injectable()
 export class PermissionService {

@@ -13,23 +13,14 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
-// Enums for predefined roles
-export enum RoleName {
-  ADMIN = 'ADMIN',
-  INVESTOR = 'INVESTOR',
-  USER = 'USER',
-}
-
 // Create Role DTO
 export class CreateRoleDto {
   @ApiProperty({
     description: 'Role name',
     example: 'INVESTOR',
-    enum: RoleName,
   })
-  @IsEnum(RoleName)
   @IsNotEmpty()
-  name: RoleName;
+  name: string;
 
   @ApiPropertyOptional({
     description: 'Role description',

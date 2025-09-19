@@ -21,7 +21,7 @@ import {
   Role,
   RoleAssignmentContext,
   AuthenticatedUser,
-} from '../interfaces/auth.interface';
+} from '../../auth/interfaces/auth.interface';
 
 @Injectable()
 export class RoleService {

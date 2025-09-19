@@ -4,16 +4,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
-import { RoleController } from './controllers/role.controller';
-import { PermissionController } from './controllers/permission.controller';
 import { AuthService } from './services/auth.service';
 import { SessionService } from './services/session.service';
-import { RoleService } from './services/role.service';
-import { PermissionService } from './services/permission.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RoleGuard } from './guards/role.guard';
-import { PermissionGuard } from './guards/permission.guard';
 import { PrismaService } from '../common/prisma/prisma.service';
 
 @Module({
@@ -43,26 +37,18 @@ import { PrismaService } from '../common/prisma/prisma.service';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController, RoleController, PermissionController],
+  controllers: [AuthController],
   providers: [
     AuthService,
     SessionService,
-    RoleService,
-    PermissionService,
     JwtStrategy,
     JwtAuthGuard,
-    RoleGuard,
-    PermissionGuard,
     PrismaService,
   ],
   exports: [
     AuthService,
     SessionService,
-    RoleService,
-    PermissionService,
     JwtAuthGuard,
-    RoleGuard,
-    PermissionGuard,
     PrismaService,
   ],
 })

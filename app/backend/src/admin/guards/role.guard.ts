@@ -13,8 +13,8 @@ import {
   REQUIRE_PERMISSIONS_KEY,
   REQUIRE_ANY_PERMISSION_KEY,
 } from '../decorators/role.decorator';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { AuthenticatedUser } from '../interfaces/auth.interface';
+import { IS_PUBLIC_KEY } from '../../auth/decorators/public.decorator';
+import { AuthenticatedUser } from '../../auth/interfaces/auth.interface';
 import { RoleService } from '../services/role.service';
 import { PermissionService } from '../services/permission.service';
 

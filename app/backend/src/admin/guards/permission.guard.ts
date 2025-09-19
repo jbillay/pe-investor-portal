@@ -7,10 +7,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AuthenticatedUser } from '../interfaces/auth.interface';
+import { AuthenticatedUser } from '../../auth/interfaces/auth.interface';
 import { PermissionService } from '../services/permission.service';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { PermissionName, ResourceType } from '../dto/permission.dto';
+import { IS_PUBLIC_KEY } from '../../auth/decorators/public.decorator';
 
 // Metadata keys for permission checking
 export const PERMISSION_CHECK_KEY = 'permissionCheck';
@@ -90,8 +89,8 @@ export class PermissionGuard implements CanActivate {
 
       // Check user permission
       const permissionResult = await this.permissionService.checkUserPermission(user.id, {
-        permission: permission as PermissionName,
-        resource: resource as ResourceType,
+        permission: permission,
+        resource: resource,
         resourceId,
       });
 

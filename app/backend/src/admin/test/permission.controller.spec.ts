@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PermissionController } from './permission.controller';
+import { PermissionController } from '../controllers/permission.controller';
 import { PermissionService } from '../services/permission.service';
 import {
   CreatePermissionDto,
@@ -9,7 +9,7 @@ import {
   BulkAssignPermissionsDto,
   CheckPermissionDto,
 } from '../dto/permission.dto';
-import { AuthenticatedUser } from '../interfaces/auth.interface';
+import { AuthenticatedUser } from '../../auth/interfaces/auth.interface';
 
 // Mock PermissionService
 const mockPermissionService = {

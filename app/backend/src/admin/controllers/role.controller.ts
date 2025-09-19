@@ -40,20 +40,20 @@ import {
   UserWithRolesResponseDto,
   RoleAssignmentResponseDto,
 } from '../dto/role.dto';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RoleGuard } from '../guards/role.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import {
   AdminOnly,
   RequireRoles,
   RequireAnyRole,
   RequireRoleManagement,
 } from '../decorators/role.decorator';
-import { AuthenticatedUser } from '../interfaces/auth.interface';
+import { AuthenticatedUser } from '../../auth/interfaces/auth.interface';
 import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Role Management')
-@Controller('roles')
+@Controller('admin/roles')
 @UseGuards(JwtAuthGuard, RoleGuard)
 @ApiBearerAuth('JWT-auth')
 export class RoleController {

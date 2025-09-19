@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { RoleController } from './role.controller';
+import { RoleController } from '../controllers/role.controller';
 import { RoleService } from '../services/role.service';
 import { CreateRoleDto, UpdateRoleDto, AssignRoleDto, RevokeRoleDto, BulkAssignRolesDto } from '../dto/role.dto';
-import { AuthenticatedUser } from '../interfaces/auth.interface';
+import { AuthenticatedUser } from '../../auth/interfaces/auth.interface';
 
 // Mock RoleService
 const mockRoleService = {
