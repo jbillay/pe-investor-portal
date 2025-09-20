@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PermissionController } from '../controllers/permission.controller';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { RoleGuard } from '../guards/role.guard';
 import { PermissionService } from '../services/permission.service';
 import {
   CreatePermissionDto,
@@ -65,7 +67,12 @@ describe('PermissionController', () => {
           useValue: mockPermissionService,
         },
       ],
-    }).compile();
+    })
+    .overrideGuard(JwtAuthGuard)
+    .useValue({ canActivate: () => true })
+    .overrideGuard(RoleGuard)
+    .useValue({ canActivate: () => true })
+    .compile();
 
     controller = module.get<PermissionController>(PermissionController);
     permissionService = module.get(PermissionService);
@@ -110,7 +117,7 @@ describe('PermissionController', () => {
       const permissions = [mockPermission];
       mockPermissionService.getAllPermissions.mockResolvedValue(permissions);
 
-      const result = await controller.getAllPermissions();
+      const result = await controller.getAllPermissions(false);
 
       expect(mockPermissionService.getAllPermissions).toHaveBeenCalledWith(false);
       expect(result).toEqual(permissions);

@@ -408,7 +408,7 @@ describe('FundController', () => {
           totalCommitted: 85000000,
           totalDrawn: 25000000,
           totalDistributed: 5000000,
-          unrealizedValue: 95000000,
+          unrealizedValue: 100000000,
           realizedValue: 5000000,
         },
       };

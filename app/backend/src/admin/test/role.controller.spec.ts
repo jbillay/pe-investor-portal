@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { RoleController } from '../controllers/role.controller';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { RoleGuard } from '../guards/role.guard';
 import { RoleService } from '../services/role.service';
 import { CreateRoleDto, UpdateRoleDto, AssignRoleDto, RevokeRoleDto, BulkAssignRolesDto } from '../dto/role.dto';
 import { AuthenticatedUser } from '../../auth/interfaces/auth.interface';
@@ -17,9 +19,9 @@ const mockRoleService = {
   revokeRole: jest.fn(),
   bulkAssignRoles: jest.fn(),
   getUserRoles: jest.fn(),
-  getUserRoleHistory: jest.fn(),
+  getRoleAssignmentHistory: jest.fn(),
   getDefaultRole: jest.fn(),
-  getRoleUsers: jest.fn(),
+  getUsersWithRole: jest.fn(),
   userHasRole: jest.fn(),
   userHasAnyRole: jest.fn(),
 };
@@ -59,7 +61,12 @@ describe('RoleController', () => {
           useValue: mockRoleService,
         },
       ],
-    }).compile();
+    })
+    .overrideGuard(JwtAuthGuard)
+    .useValue({ canActivate: () => true })
+    .overrideGuard(RoleGuard)
+    .useValue({ canActivate: () => true })
+    .compile();
 
     controller = module.get<RoleController>(RoleController);
     roleService = module.get(RoleService);
@@ -102,7 +109,7 @@ describe('RoleController', () => {
       const roles = [mockRole];
       mockRoleService.getAllRoles.mockResolvedValue(roles);
 
-      const result = await controller.getAllRoles();
+      const result = await controller.getAllRoles(false);
 
       expect(mockRoleService.getAllRoles).toHaveBeenCalledWith(false);
       expect(result).toEqual(roles);
@@ -209,6 +216,7 @@ describe('RoleController', () => {
       headers: { 'user-agent': 'test-agent' },
       ip: '127.0.0.1',
       connection: { remoteAddress: '127.0.0.1' },
+      get: jest.fn().mockReturnValue('test-agent'),
     };
 
     it('should assign role successfully', async () => {
@@ -239,6 +247,7 @@ describe('RoleController', () => {
         headers: {},
         ip: '127.0.0.1',
         connection: { remoteAddress: '127.0.0.1' },
+        get: jest.fn().mockReturnValue(undefined),
       };
 
       mockRoleService.assignRole.mockResolvedValue(undefined);
@@ -249,7 +258,7 @@ describe('RoleController', () => {
         assignRoleDto,
         {
           assignedBy: mockUser.id,
-          userAgent: 'Unknown',
+          userAgent: undefined,
           ipAddress: '127.0.0.1',
         }
       );
@@ -267,6 +276,7 @@ describe('RoleController', () => {
       headers: { 'user-agent': 'test-agent' },
       ip: '127.0.0.1',
       connection: { remoteAddress: '127.0.0.1' },
+      get: jest.fn().mockReturnValue('test-agent'),
     };
 
     it('should revoke role successfully', async () => {
@@ -277,7 +287,7 @@ describe('RoleController', () => {
       expect(mockRoleService.revokeRole).toHaveBeenCalledWith(
         revokeRoleDto,
         {
-          revokedBy: mockUser.id,
+          assignedBy: mockUser.id,
           userAgent: 'test-agent',
           ipAddress: '127.0.0.1',
         }
@@ -304,6 +314,7 @@ describe('RoleController', () => {
       headers: { 'user-agent': 'test-agent' },
       ip: '127.0.0.1',
       connection: { remoteAddress: '127.0.0.1' },
+      get: jest.fn().mockReturnValue('test-agent'),
     };
 
     it('should handle bulk assignment successfully', async () => {
@@ -317,9 +328,11 @@ describe('RoleController', () => {
 
       expect(mockRoleService.bulkAssignRoles).toHaveBeenCalledWith(
         bulkAssignDto,
-        mockUser.id,
-        'test-agent',
-        '127.0.0.1'
+        {
+          assignedBy: mockUser.id,
+          userAgent: 'test-agent',
+          ipAddress: '127.0.0.1',
+        }
       );
       expect(result).toEqual(bulkResult);
     });
@@ -394,11 +407,11 @@ describe('RoleController', () => {
           isActive: true,
         },
       ];
-      mockRoleService.getUserRoleHistory.mockResolvedValue(mockHistory);
+      mockRoleService.getRoleAssignmentHistory.mockResolvedValue(mockHistory);
 
-      const result = await controller.getUserRoleHistory('user-1');
+      const result = await controller.getRoleAssignmentHistory('user-1');
 
-      expect(mockRoleService.getUserRoleHistory).toHaveBeenCalledWith('user-1');
+      expect(mockRoleService.getRoleAssignmentHistory).toHaveBeenCalledWith('user-1');
       expect(result).toEqual(mockHistory);
     });
   });
@@ -434,11 +447,11 @@ describe('RoleController', () => {
           assignedAt: new Date(),
         },
       ];
-      mockRoleService.getRoleUsers.mockResolvedValue(mockRoleUsers);
+      mockRoleService.getUsersWithRole.mockResolvedValue(mockRoleUsers);
 
-      const result = await controller.getRoleUsers('role-1');
+      const result = await controller.getUsersWithRole('role-1');
 
-      expect(mockRoleService.getRoleUsers).toHaveBeenCalledWith('role-1');
+      expect(mockRoleService.getUsersWithRole).toHaveBeenCalledWith('role-1');
       expect(result).toEqual(mockRoleUsers);
     });
   });

@@ -636,5 +636,515 @@ describe('UserController (e2e)', () => {
 
       expect([200, 500]).toContain(response.status);
     });
+
+    it('should handle malformed requests gracefully', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/admin/users')
+        .set('Authorization', adminToken)
+        .send('invalid json')
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should handle missing content-type header', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/admin/users')
+        .set('Authorization', adminToken)
+        .set('Content-Type', '')
+        .send({
+          email: 'test@test.com',
+          password: 'SecurePass123!',
+          firstName: 'Test',
+          lastName: 'User'
+        });
+
+      expect([400, 415]).toContain(response.status);
+    });
+
+    it('should handle SQL injection attempts', async () => {
+      const maliciousInput = "'; DROP TABLE users; --";
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/admin/users?search=${encodeURIComponent(maliciousInput)}`)
+        .set('Authorization', adminToken);
+
+      expect([200, 400]).toContain(response.status);
+      // Should not crash and should sanitize input
+    });
+
+    it('should handle XSS attempts in user data', async () => {
+      const xssPayload = '<script>alert("xss")</script>';
+
+      const createUserDto: CreateUserDto = {
+        email: 'xss@test.com',
+        password: 'SecurePass123!',
+        firstName: xssPayload,
+        lastName: 'User'
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/admin/users')
+        .set('Authorization', adminToken)
+        .send(createUserDto);
+
+      if (response.status === 201) {
+        // If created, verify the XSS payload was sanitized
+        expect(response.body.firstName).not.toContain('<script>');
+
+        // Cleanup
+        await prismaService.user.delete({
+          where: { id: response.body.id }
+        });
+      } else {
+        expect(response.status).toBe(400);
+      }
+    });
+  });
+
+  describe('Security Tests', () => {
+    it('should not expose sensitive data in responses', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/admin/users/${testUsers[0].id}`)
+        .set('Authorization', adminToken)
+        .expect(200);
+
+      expect(response.body).not.toHaveProperty('password');
+      expect(response.body).not.toHaveProperty('passwordResetToken');
+      expect(response.body).not.toHaveProperty('emailVerificationToken');
+    });
+
+    it('should require strong passwords', async () => {
+      const weakPasswords = [
+        'password',
+        '12345678',
+        'abcdefgh',
+        'PASSWORD',
+        'Password',
+        'pass123',
+        'Passw0rd'
+      ];
+
+      for (const weakPassword of weakPasswords) {
+        const createUserDto: CreateUserDto = {
+          email: `weak${Date.now()}@test.com`,
+          password: weakPassword,
+          firstName: 'Weak',
+          lastName: 'Password'
+        };
+
+        await request(app.getHttpServer())
+          .post('/api/admin/users')
+          .set('Authorization', adminToken)
+          .send(createUserDto)
+          .expect(400);
+      }
+    });
+
+    it('should validate email format strictly', async () => {
+      const invalidEmails = [
+        'invalid-email',
+        '@domain.com',
+        'user@',
+        'user.domain.com',
+        'user@domain',
+        'user with spaces@domain.com',
+        'user..double@domain.com'
+      ];
+
+      for (const invalidEmail of invalidEmails) {
+        const createUserDto: CreateUserDto = {
+          email: invalidEmail,
+          password: 'SecurePass123!',
+          firstName: 'Test',
+          lastName: 'User'
+        };
+
+        await request(app.getHttpServer())
+          .post('/api/admin/users')
+          .set('Authorization', adminToken)
+          .send(createUserDto)
+          .expect(400);
+      }
+    });
+
+    it('should prevent privilege escalation', async () => {
+      // Non-admin user trying to create admin user
+      const regularUserToken = createTestJwtToken({
+        sub: 'regular-user-123',
+        email: 'regular@test.com',
+        roles: ['INVESTOR']
+      });
+
+      const createAdminDto: CreateUserDto = {
+        email: 'newadmin@test.com',
+        password: 'SecurePass123!',
+        firstName: 'New',
+        lastName: 'Admin',
+        roles: ['SUPER_ADMIN']
+      };
+
+      await request(app.getHttpServer())
+        .post('/api/admin/users')
+        .set('Authorization', `Bearer ${regularUserToken.token}`)
+        .send(createAdminDto)
+        .expect(403);
+    });
+
+    it('should enforce authorization on all endpoints', async () => {
+      const endpoints = [
+        { method: 'get', url: '/api/admin/users' },
+        { method: 'get', url: `/api/admin/users/${testUsers[0].id}` },
+        { method: 'post', url: '/api/admin/users' },
+        { method: 'put', url: `/api/admin/users/${testUsers[0].id}` },
+        { method: 'patch', url: `/api/admin/users/${testUsers[0].id}/status` },
+        { method: 'delete', url: `/api/admin/users/${testUsers[0].id}` },
+        { method: 'get', url: '/api/admin/users/stats' }
+      ];
+
+      for (const endpoint of endpoints) {
+        let req = request(app.getHttpServer())[endpoint.method](endpoint.url);
+
+        if (endpoint.method !== 'get') {
+          req = req.send({});
+        }
+
+        await req.expect(401);
+      }
+    });
+  });
+
+  describe('Data Validation and Sanitization', () => {
+    it('should trim whitespace from string fields', async () => {
+      const createUserDto: CreateUserDto = {
+        email: '  trimtest@test.com  ',
+        password: 'SecurePass123!',
+        firstName: '  John  ',
+        lastName: '  Doe  '
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/admin/users')
+        .set('Authorization', adminToken)
+        .send(createUserDto)
+        .expect(201);
+
+      expect(response.body.email).toBe('trimtest@test.com');
+      expect(response.body.firstName).toBe('John');
+      expect(response.body.lastName).toBe('Doe');
+
+      // Cleanup
+      await prismaService.user.delete({
+        where: { id: response.body.id }
+      });
+    });
+
+    it('should validate phone number formats', async () => {
+      const invalidPhones = [
+        '123',
+        'invalid-phone',
+        '123-456-7890-extra',
+        '+1-2345',
+        'phone-number'
+      ];
+
+      for (const invalidPhone of invalidPhones) {
+        const createUserDto: CreateUserDto = {
+          email: `phone${Date.now()}@test.com`,
+          password: 'SecurePass123!',
+          firstName: 'Test',
+          lastName: 'User',
+          phone: invalidPhone
+        };
+
+        await request(app.getHttpServer())
+          .post('/api/admin/users')
+          .set('Authorization', adminToken)
+          .send(createUserDto)
+          .expect(400);
+      }
+    });
+
+    it('should validate timezone values', async () => {
+      const createUserDto: CreateUserDto = {
+        email: 'timezone@test.com',
+        password: 'SecurePass123!',
+        firstName: 'Test',
+        lastName: 'User',
+        timezone: 'Invalid/Timezone'
+      };
+
+      await request(app.getHttpServer())
+        .post('/api/admin/users')
+        .set('Authorization', adminToken)
+        .send(createUserDto)
+        .expect(400);
+    });
+
+    it('should validate language codes', async () => {
+      const createUserDto: CreateUserDto = {
+        email: 'language@test.com',
+        password: 'SecurePass123!',
+        firstName: 'Test',
+        lastName: 'User',
+        language: 'invalid-language' as any
+      };
+
+      await request(app.getHttpServer())
+        .post('/api/admin/users')
+        .set('Authorization', adminToken)
+        .send(createUserDto)
+        .expect(400);
+    });
+
+    it('should enforce maximum field lengths', async () => {
+      const longString = 'a'.repeat(256);
+
+      const createUserDto: CreateUserDto = {
+        email: 'maxlength@test.com',
+        password: 'SecurePass123!',
+        firstName: longString,
+        lastName: 'User'
+      };
+
+      await request(app.getHttpServer())
+        .post('/api/admin/users')
+        .set('Authorization', adminToken)
+        .send(createUserDto)
+        .expect(400);
+    });
+  });
+
+  describe('Concurrency and Race Conditions', () => {
+    it('should handle concurrent user creation with same email', async () => {
+      const createUserDto: CreateUserDto = {
+        email: 'concurrent@test.com',
+        password: 'SecurePass123!',
+        firstName: 'Concurrent',
+        lastName: 'User'
+      };
+
+      const promises = Array(3).fill(null).map(() =>
+        request(app.getHttpServer())
+          .post('/api/admin/users')
+          .set('Authorization', adminToken)
+          .send(createUserDto)
+      );
+
+      const responses = await Promise.all(promises);
+
+      // Only one should succeed
+      const successCount = responses.filter(r => r.status === 201).length;
+      const conflictCount = responses.filter(r => r.status === 409).length;
+
+      expect(successCount).toBe(1);
+      expect(conflictCount).toBe(2);
+
+      // Cleanup
+      const successfulResponse = responses.find(r => r.status === 201);
+      if (successfulResponse) {
+        await prismaService.user.delete({
+          where: { id: successfulResponse.body.id }
+        });
+      }
+    });
+
+    it('should handle concurrent role assignments', async () => {
+      const testRole = await prismaService.role.create({
+        data: createTestRole({ name: 'CONCURRENT_TEST_ROLE', description: 'Concurrent Test Role' })
+      });
+
+      const userId = testUsers[1].id;
+      const assignRolesDto: AssignRolesDto = {
+        roles: ['CONCURRENT_TEST_ROLE'],
+        reason: 'Concurrent test'
+      };
+
+      const promises = Array(3).fill(null).map(() =>
+        request(app.getHttpServer())
+          .post(`/api/admin/users/${userId}/roles`)
+          .set('Authorization', adminToken)
+          .send(assignRolesDto)
+      );
+
+      const responses = await Promise.all(promises);
+
+      // All should succeed (idempotent operation)
+      responses.forEach(response => {
+        expect([200, 409]).toContain(response.status);
+      });
+
+      // Cleanup
+      await prismaService.userRole.deleteMany({
+        where: { userId, roleId: testRole.id }
+      });
+      await prismaService.role.delete({
+        where: { id: testRole.id }
+      });
+    });
+  });
+
+  describe('Edge Cases and Boundary Conditions', () => {
+    it('should handle empty search queries', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/admin/users?search=')
+        .set('Authorization', adminToken)
+        .expect(200);
+
+      expect(response.body.data).toBeInstanceOf(Array);
+    });
+
+    it('should handle very large page sizes', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/admin/users?limit=1000')
+        .set('Authorization', adminToken)
+        .expect(200);
+
+      expect(response.body.pagination.limit).toBeLessThanOrEqual(100); // Should be capped
+    });
+
+    it('should handle negative page numbers', async () => {
+      await request(app.getHttpServer())
+        .get('/api/admin/users?page=-1')
+        .set('Authorization', adminToken)
+        .expect(400);
+    });
+
+    it('should handle zero page size', async () => {
+      await request(app.getHttpServer())
+        .get('/api/admin/users?limit=0')
+        .set('Authorization', adminToken)
+        .expect(400);
+    });
+
+    it('should handle non-existent role assignments', async () => {
+      const userId = testUsers[1].id;
+      const assignRolesDto: AssignRolesDto = {
+        roles: ['NON_EXISTENT_ROLE'],
+        reason: 'Test non-existent role'
+      };
+
+      await request(app.getHttpServer())
+        .post(`/api/admin/users/${userId}/roles`)
+        .set('Authorization', adminToken)
+        .send(assignRolesDto)
+        .expect(400);
+    });
+
+    it('should handle empty role arrays', async () => {
+      const userId = testUsers[1].id;
+      const assignRolesDto: AssignRolesDto = {
+        roles: [],
+        reason: 'Test empty roles'
+      };
+
+      await request(app.getHttpServer())
+        .post(`/api/admin/users/${userId}/roles`)
+        .set('Authorization', adminToken)
+        .send(assignRolesDto)
+        .expect(400);
+    });
+
+    it('should handle special characters in search', async () => {
+      const specialChars = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '[', ']', '{', '}'];
+
+      for (const char of specialChars) {
+        const response = await request(app.getHttpServer())
+          .get(`/api/admin/users?search=${encodeURIComponent(char)}`)
+          .set('Authorization', adminToken);
+
+        expect([200, 400]).toContain(response.status);
+      }
+    });
+  });
+
+  describe('Audit and Logging', () => {
+    it('should log user creation events', async () => {
+      const createUserDto: CreateUserDto = {
+        email: 'audit@test.com',
+        password: 'SecurePass123!',
+        firstName: 'Audit',
+        lastName: 'Test'
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/admin/users')
+        .set('Authorization', adminToken)
+        .send(createUserDto)
+        .expect(201);
+
+      // Verify audit trail (implementation depends on your audit system)
+      const createdUser = await prismaService.user.findUnique({
+        where: { id: response.body.id }
+      });
+
+      expect(createdUser?.createdBy).toBeTruthy();
+      expect(createdUser?.createdAt).toBeInstanceOf(Date);
+
+      // Cleanup
+      await prismaService.user.delete({
+        where: { id: response.body.id }
+      });
+    });
+
+    it('should track user modifications', async () => {
+      const userId = testUsers[1].id;
+      const updateUserDto: UpdateUserDto = {
+        firstName: 'Modified',
+        reason: 'Audit test'
+      };
+
+      const response = await request(app.getHttpServer())
+        .put(`/api/admin/users/${userId}`)
+        .set('Authorization', adminToken)
+        .send(updateUserDto)
+        .expect(200);
+
+      // Verify modification tracking
+      const updatedUser = await prismaService.user.findUnique({
+        where: { id: userId }
+      });
+
+      expect(updatedUser?.updatedAt).toBeInstanceOf(Date);
+      expect(response.body.firstName).toBe('Modified');
+    });
+  });
+
+  describe('Performance Tests', () => {
+    it('should handle bulk operations efficiently', async () => {
+      const startTime = Date.now();
+
+      const bulkOperationDto = {
+        userIds: [testUsers[1].id],
+        roles: ['INVESTOR'],
+        operation: 'assign' as const,
+        reason: 'Performance test'
+      };
+
+      await request(app.getHttpServer())
+        .post('/api/admin/users/bulk/roles')
+        .set('Authorization', adminToken)
+        .send(bulkOperationDto)
+        .expect(200);
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
+    });
+
+    it('should paginate large datasets efficiently', async () => {
+      const startTime = Date.now();
+
+      await request(app.getHttpServer())
+        .get('/api/admin/users?page=1&limit=50')
+        .set('Authorization', adminToken)
+        .expect(200);
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      expect(duration).toBeLessThan(2000); // Should complete within 2 seconds
+    });
   });
 });

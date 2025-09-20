@@ -34,7 +34,7 @@ describe('FundService', () => {
   const mockFund = {
     id: 'fund-123',
     name: 'Test PE Fund',
-    description: 'A test private equity fund',
+    description: null,
     fundType: 'PE',
     vintage: 2024,
     targetSize: 100000000,

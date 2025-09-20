@@ -65,12 +65,31 @@ describe('JwtStrategy', () => {
         lastName: user.lastName,
         isActive: user.isActive,
         isVerified: user.isVerified,
+        roles: expect.any(Array),
+        permissions: expect.any(Array),
       });
 
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: {
           id: validPayload.sub,
           isActive: true,
+        },
+        include: {
+          userRoles: {
+            where: { isActive: true },
+            include: {
+              role: {
+                include: {
+                  rolePermissions: {
+                    where: { isActive: true },
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       });
     });
@@ -147,11 +166,13 @@ describe('JwtStrategy', () => {
         lastName: user.lastName,
         isActive: user.isActive,
         isVerified: user.isVerified,
+        roles: expect.any(Array),
+        permissions: expect.any(Array),
       });
 
-      // Should not include additional payload fields
+      // Should not include additional payload fields (but does include roles/permissions from DB)
       expect(result).not.toHaveProperty('role');
-      expect(result).not.toHaveProperty('permissions');
+      expect(result).toHaveProperty('permissions'); // This comes from DB, not payload
       expect(result).not.toHaveProperty('customField');
     });
 

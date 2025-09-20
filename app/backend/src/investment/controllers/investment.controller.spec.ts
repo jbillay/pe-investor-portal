@@ -87,7 +87,7 @@ describe('InvestmentController', () => {
     it('should create an investment successfully', async () => {
       mockInvestmentService.createInvestment.mockResolvedValue(mockInvestment);
 
-      const result = await controller.createInvestment(mockRequest, createInvestmentDto);
+      const result = await controller.createInvestment(mockUser, createInvestmentDto);
 
       expect(mockInvestmentService.createInvestment).toHaveBeenCalledWith(
         mockUser.id,
@@ -102,7 +102,7 @@ describe('InvestmentController', () => {
       );
 
       await expect(
-        controller.createInvestment(mockRequest, createInvestmentDto)
+        controller.createInvestment(mockUser, createInvestmentDto)
       ).rejects.toThrow(ForbiddenException);
     });
   });
@@ -112,7 +112,7 @@ describe('InvestmentController', () => {
       const investments = [mockInvestment, { ...mockInvestment, id: 'investment-456' }];
       mockInvestmentService.getUserInvestments.mockResolvedValue(investments);
 
-      const result = await controller.getUserInvestments(mockRequest);
+      const result = await controller.getUserInvestments(mockUser);
 
       expect(mockInvestmentService.getUserInvestments).toHaveBeenCalledWith(mockUser.id);
       expect(result).toEqual(investments);
@@ -122,7 +122,7 @@ describe('InvestmentController', () => {
     it('should return empty array when user has no investments', async () => {
       mockInvestmentService.getUserInvestments.mockResolvedValue([]);
 
-      const result = await controller.getUserInvestments(mockRequest);
+      const result = await controller.getUserInvestments(mockUser);
 
       expect(result).toEqual([]);
     });
@@ -132,7 +132,7 @@ describe('InvestmentController', () => {
     it('should return investment by id', async () => {
       mockInvestmentService.getInvestmentById.mockResolvedValue(mockInvestment);
 
-      const result = await controller.getInvestment(mockRequest, 'investment-123');
+      const result = await controller.getInvestmentById(mockUser, 'investment-123');
 
       expect(mockInvestmentService.getInvestmentById).toHaveBeenCalledWith(
         mockUser.id,
@@ -147,7 +147,7 @@ describe('InvestmentController', () => {
       );
 
       await expect(
-        controller.getInvestment(mockRequest, 'non-existent')
+        controller.getInvestmentById(mockUser, 'non-existent')
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -164,7 +164,7 @@ describe('InvestmentController', () => {
       mockInvestmentService.updateInvestment.mockResolvedValue(updatedInvestment);
 
       const result = await controller.updateInvestment(
-        mockRequest,
+        mockUser,
         'investment-123',
         updateInvestmentDto
       );
@@ -184,7 +184,7 @@ describe('InvestmentController', () => {
       );
 
       await expect(
-        controller.updateInvestment(mockRequest, 'non-existent', updateInvestmentDto)
+        controller.updateInvestment(mockUser, 'non-existent', updateInvestmentDto)
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -193,7 +193,7 @@ describe('InvestmentController', () => {
     it('should delete investment successfully', async () => {
       mockInvestmentService.deleteInvestment.mockResolvedValue(undefined);
 
-      await controller.deleteInvestment(mockRequest, 'investment-123');
+      await controller.deleteInvestment(mockUser, 'investment-123');
 
       expect(mockInvestmentService.deleteInvestment).toHaveBeenCalledWith(
         mockUser.id,
@@ -207,7 +207,7 @@ describe('InvestmentController', () => {
       );
 
       await expect(
-        controller.deleteInvestment(mockRequest, 'non-existent')
+        controller.deleteInvestment(mockUser, 'non-existent')
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -226,7 +226,7 @@ describe('InvestmentController', () => {
       };
       mockInvestmentService.getInvestmentSummary.mockResolvedValue(summary);
 
-      const result = await controller.getInvestmentSummary(mockRequest);
+      const result = await controller.getInvestmentSummary(mockUser);
 
       expect(mockInvestmentService.getInvestmentSummary).toHaveBeenCalledWith(mockUser.id);
       expect(result).toEqual(summary);
@@ -247,7 +247,7 @@ describe('InvestmentController', () => {
       };
       mockInvestmentService.getInvestmentSummary.mockResolvedValue(emptySummary);
 
-      const result = await controller.getInvestmentSummary(mockRequest);
+      const result = await controller.getInvestmentSummary(mockUser);
 
       expect(result.totalInvestments).toBe(0);
       expect(result.totalCommitted).toBe(0);
@@ -273,7 +273,7 @@ describe('InvestmentController', () => {
       };
       mockInvestmentService.getInvestmentPerformance.mockResolvedValue(performance);
 
-      const result = await controller.getInvestmentPerformance(mockRequest, 'investment-123');
+      const result = await controller.getInvestmentPerformance(mockUser, 'investment-123');
 
       expect(mockInvestmentService.getInvestmentPerformance).toHaveBeenCalledWith(
         mockUser.id,
@@ -290,7 +290,7 @@ describe('InvestmentController', () => {
       );
 
       await expect(
-        controller.getInvestmentPerformance(mockRequest, 'non-existent')
+        controller.getInvestmentPerformance(mockUser, 'non-existent')
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -304,7 +304,7 @@ describe('InvestmentController', () => {
       );
 
       await expect(
-        controller.getInvestment(mockRequest, invalidId)
+        controller.getInvestmentById(mockUser, invalidId)
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -318,7 +318,7 @@ describe('InvestmentController', () => {
       );
 
       await expect(
-        controller.createInvestment(mockRequest, invalidDto)
+        controller.createInvestment(mockUser, invalidDto)
       ).rejects.toThrow();
     });
   });
@@ -328,7 +328,7 @@ describe('InvestmentController', () => {
       // The controller should always pass the authenticated user's ID
       mockInvestmentService.getUserInvestments.mockResolvedValue([]);
 
-      await controller.getUserInvestments(mockRequest);
+      await controller.getUserInvestments(mockUser);
 
       expect(mockInvestmentService.getUserInvestments).toHaveBeenCalledWith(mockUser.id);
       // Ensure it's not called with any other user ID
@@ -340,9 +340,9 @@ describe('InvestmentController', () => {
       mockInvestmentService.updateInvestment.mockResolvedValue(mockInvestment);
       mockInvestmentService.deleteInvestment.mockResolvedValue(undefined);
 
-      await controller.getInvestment(mockRequest, 'investment-123');
-      await controller.updateInvestment(mockRequest, 'investment-123', {});
-      await controller.deleteInvestment(mockRequest, 'investment-123');
+      await controller.getInvestmentById(mockUser, 'investment-123');
+      await controller.updateInvestment(mockUser, 'investment-123', {});
+      await controller.deleteInvestment(mockUser, 'investment-123');
 
       expect(mockInvestmentService.getInvestmentById).toHaveBeenCalledWith(
         mockUser.id,

@@ -280,9 +280,10 @@ export class UserRoleSetupService {
       // Group permissions by resource
       const resourcePermissions: Record<string, string[]> = {};
       for (const permission of userPermissions.permissions) {
-        if (permission.resource && !resourcePermissions[permission.resource]) {
-          resourcePermissions[permission.resource] = [];
-        } else if (permission.resource && permission.action) {
+        if (permission.resource && permission.action) {
+          if (!resourcePermissions[permission.resource]) {
+            resourcePermissions[permission.resource] = [];
+          }
           resourcePermissions[permission.resource].push(permission.action);
         }
       }
