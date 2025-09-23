@@ -33,51 +33,43 @@
           <div class="tab-content p-6">
             <!-- User Avatar Section -->
             <div class="avatar-section mb-6 text-center">
-              <div class="avatar-container relative inline-block">
-                <Avatar
-                  :image="formData.profileImage"
-                  :label="formData.name ? formData.name.charAt(0).toUpperCase() : 'U'"
-                  size="xlarge"
-                  shape="circle"
-                  class="user-avatar shadow-lg"
-                />
-                <Button
-                  icon="pi pi-camera"
-                  class="p-button-rounded p-button-sm avatar-edit-btn absolute -bottom-1 -right-1"
-                  @click="openImageUpload"
-                />
-              </div>
-              <div class="mt-4">
-                <Button
-                  label="Upload Photo"
-                  icon="pi pi-upload"
-                  class="p-button-outlined p-button-sm"
-                  @click="openImageUpload"
-                />
-                <Button
-                  v-if="formData.profileImage"
-                  label="Remove"
-                  icon="pi pi-trash"
-                  class="p-button-outlined p-button-sm p-button-danger ml-2"
-                  @click="removeProfileImage"
-                />
-              </div>
+              <Avatar
+                :label="userInitials"
+                size="xlarge"
+                shape="circle"
+                class="user-avatar shadow-lg bg-gradient-to-br from-blue-500 to-cyan-600 text-white font-semibold"
+              />
             </div>
 
             <!-- Personal Information Form -->
             <div class="form-grid grid grid-cols-1 md:grid-cols-2 gap-6">
               <div class="form-field">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name <span class="text-red-500">*</span>
+                  First Name <span class="text-red-500">*</span>
                 </label>
                 <InputText
-                  v-model="formData.name"
-                  placeholder="Enter full name"
+                  v-model="formData.firstName"
+                  placeholder="Enter first name"
                   class="w-full"
-                  :class="{ 'p-invalid': !formData.name && showValidationErrors }"
+                  :class="{ 'p-invalid': !formData.firstName && showValidationErrors }"
                 />
-                <small v-if="!formData.name && showValidationErrors" class="p-error">
-                  Full name is required
+                <small v-if="!formData.firstName && showValidationErrors" class="p-error">
+                  First name is required
+                </small>
+              </div>
+
+              <div class="form-field">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name <span class="text-red-500">*</span>
+                </label>
+                <InputText
+                  v-model="formData.lastName"
+                  placeholder="Enter last name"
+                  class="w-full"
+                  :class="{ 'p-invalid': !formData.lastName && showValidationErrors }"
+                />
+                <small v-if="!formData.lastName && showValidationErrors" class="p-error">
+                  Last name is required
                 </small>
               </div>
 
@@ -100,57 +92,64 @@
                 </small>
               </div>
 
-              <div class="form-field">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                <InputText
-                  v-model="formData.phone"
-                  placeholder="Enter phone number"
-                  class="w-full"
-                />
-              </div>
 
               <div class="form-field">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Job Title</label>
-                <InputText
-                  v-model="formData.jobTitle"
-                  placeholder="Enter job title"
-                  class="w-full"
-                />
-              </div>
-
-              <div class="form-field">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
                 <Dropdown
-                  v-model="formData.department"
-                  :options="departmentOptions"
+                  v-model="formData.timezone"
+                  :options="timezoneOptions"
                   optionLabel="label"
                   optionValue="value"
-                  placeholder="Select department"
+                  placeholder="Select timezone"
                   class="w-full"
-                  showClear
                 />
               </div>
 
               <div class="form-field">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Language</label>
                 <Dropdown
-                  v-model="formData.status"
-                  :options="statusOptions"
+                  v-model="formData.language"
+                  :options="languageOptions"
                   optionLabel="label"
                   optionValue="value"
-                  placeholder="Select status"
+                  placeholder="Select language"
                   class="w-full"
                 />
               </div>
 
-              <div class="form-field col-span-full">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                <Textarea
-                  v-model="formData.notes"
-                  placeholder="Add any additional notes about this user..."
-                  :rows="3"
-                  class="w-full"
-                />
+              <div class="form-field">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Account Status</label>
+                <div class="flex flex-col gap-4">
+                  <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                    <div class="flex items-center gap-2">
+                      <i class="pi pi-user text-blue-600"></i>
+                      <span class="text-sm font-medium">Active Status</span>
+                    </div>
+                    <InputSwitch v-model="formData.isActive" />
+                  </div>
+                  <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                    <div class="flex items-center gap-2">
+                      <i class="pi pi-shield text-green-600"></i>
+                      <span class="text-sm font-medium">Verification Status</span>
+                    </div>
+                    <InputSwitch v-model="formData.isVerified" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- User Statistics (Read-only indicators) -->
+              <div class="form-field">
+                <label class="block text-sm font-medium text-gray-700 mb-2">User Statistics</label>
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="stat-card bg-gray-50 rounded-lg p-3 border">
+                    <div class="text-2xl font-bold text-blue-600">{{ formData.loginCount }}</div>
+                    <div class="text-sm text-gray-600">Total Logins</div>
+                  </div>
+                  <div class="stat-card bg-gray-50 rounded-lg p-3 border">
+                    <div class="text-2xl font-bold text-green-600">{{ formData.accountAge }}</div>
+                    <div class="text-sm text-gray-600">Days Active</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -420,23 +419,23 @@
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-between">
-        <div class="text-sm text-gray-500">
-          <i class="pi pi-info-circle mr-1"></i>
+      <div class="flex items-center justify-between px-6 py-4 bg-gray-50 border-t">
+        <div class="text-sm text-gray-500 flex items-center">
+          <i class="pi pi-info-circle mr-2 text-blue-500"></i>
           {{ isNewUser ? 'User will receive a welcome email with login instructions' : 'Changes will be applied immediately' }}
         </div>
-        <div class="flex gap-3">
+        <div class="flex items-center gap-3">
           <Button
             label="Cancel"
             icon="pi pi-times"
-            class="p-button-outlined"
+            class="p-button-outlined p-button-secondary px-6 py-2"
             @click="closeDialog"
             :disabled="isSaving"
           />
           <Button
             :label="isNewUser ? 'Create User' : 'Save Changes'"
             :icon="isNewUser ? 'pi pi-plus' : 'pi pi-save'"
-            class="p-button-primary"
+            class="p-button-primary px-8 py-2 font-semibold text-white bg-blue-600 hover:bg-blue-700 border-blue-600 hover:border-blue-700"
             @click="saveUser"
             :loading="isSaving"
             :disabled="!canSaveUser"
@@ -459,6 +458,16 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
+
+// PrimeVue Components
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import Dropdown from 'primevue/dropdown';
+import Checkbox from 'primevue/checkbox';
+import InputSwitch from 'primevue/inputswitch';
+import Tag from 'primevue/tag';
+import Avatar from 'primevue/avatar';
+import Dialog from 'primevue/dialog';
 
 // Props
 const props = defineProps<{
@@ -485,20 +494,22 @@ const imageUploadInput = ref(null);
 // Form data
 const formData = ref({
   id: '',
-  name: '',
+  firstName: '',
+  lastName: '',
   email: '',
-  phone: '',
-  jobTitle: '',
-  department: '',
-  status: 'ACTIVE',
-  notes: '',
+  timezone: 'UTC',
+  language: 'en',
+  isActive: true,
+  isVerified: false,
   profileImage: '',
   roles: [],
-  mfaEnabled: false,
-  isLocked: false,
-  lastLogin: null,
-  lastLoginIP: '',
-  lastLoginLocation: '',
+  permissions: [],
+  permissionCount: 0,
+  loginCount: 0,
+  accountAge: 0,
+  lastLoginAt: null,
+  createdAt: null,
+  updatedAt: null,
 });
 
 // New role assignment
@@ -507,21 +518,29 @@ const newRole = ref({
   reason: '',
 });
 
-// Mock data
-const departmentOptions = [
-  { label: 'Fund Management', value: 'FUND_MANAGEMENT' },
-  { label: 'Compliance', value: 'COMPLIANCE' },
-  { label: 'Operations', value: 'OPERATIONS' },
-  { label: 'Technology', value: 'TECHNOLOGY' },
-  { label: 'Research', value: 'RESEARCH' },
-  { label: 'Administration', value: 'ADMINISTRATION' },
+// Options data
+const timezoneOptions = [
+  { label: 'UTC', value: 'UTC' },
+  { label: 'America/New_York (EST/EDT)', value: 'America/New_York' },
+  { label: 'America/Chicago (CST/CDT)', value: 'America/Chicago' },
+  { label: 'America/Denver (MST/MDT)', value: 'America/Denver' },
+  { label: 'America/Los_Angeles (PST/PDT)', value: 'America/Los_Angeles' },
+  { label: 'Europe/London (GMT/BST)', value: 'Europe/London' },
+  { label: 'Europe/Paris (CET/CEST)', value: 'Europe/Paris' },
+  { label: 'Asia/Tokyo (JST)', value: 'Asia/Tokyo' },
+  { label: 'Asia/Shanghai (CST)', value: 'Asia/Shanghai' },
+  { label: 'Australia/Sydney (AEST/AEDT)', value: 'Australia/Sydney' },
 ];
 
-const statusOptions = [
-  { label: 'Active', value: 'ACTIVE' },
-  { label: 'Inactive', value: 'INACTIVE' },
-  { label: 'Pending', value: 'PENDING' },
-  { label: 'Suspended', value: 'SUSPENDED' },
+const languageOptions = [
+  { label: 'English', value: 'en' },
+  { label: 'French', value: 'fr' },
+  { label: 'German', value: 'de' },
+  { label: 'Spanish', value: 'es' },
+  { label: 'Italian', value: 'it' },
+  { label: 'Portuguese', value: 'pt' },
+  { label: 'Chinese', value: 'zh' },
+  { label: 'Japanese', value: 'ja' },
 ];
 
 const availableRoles = ref([
@@ -563,8 +582,19 @@ const userActivities = ref([
 // Computed properties
 const isNewUser = computed(() => !props.user || !props.user.id);
 
+const userInitials = computed(() => {
+  const first = formData.value.firstName?.charAt(0) || '';
+  const last = formData.value.lastName?.charAt(0) || '';
+  return (first + last).toUpperCase() || 'U';
+});
+
+const fullName = computed(() => {
+  return `${formData.value.firstName} ${formData.value.lastName}`.trim();
+});
+
 const canSaveUser = computed(() => {
-  return formData.value.name.trim() &&
+  return formData.value.firstName.trim() &&
+         formData.value.lastName.trim() &&
          formData.value.email.trim() &&
          isValidEmail(formData.value.email) &&
          !isSaving.value;
@@ -685,20 +715,31 @@ const formatDateTime = (date: Date) => {
 
 const loadUserData = () => {
   if (props.user) {
+    // Calculate account age in days
+    const accountAge = props.user.createdAt
+      ? Math.floor((Date.now() - new Date(props.user.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
     formData.value = {
       id: props.user.id || '',
-      name: props.user.name || '',
+      firstName: props.user.firstName || '',
+      lastName: props.user.lastName || '',
       email: props.user.email || '',
-      phone: props.user.phone || '',
-      jobTitle: props.user.jobTitle || '',
-      department: props.user.department || '',
-      status: props.user.status || 'ACTIVE',
-      notes: props.user.notes || '',
+      timezone: props.user.timezone || 'UTC',
+      language: props.user.language || 'en',
+      isActive: props.user.isActive !== undefined ? props.user.isActive : true,
+      isVerified: props.user.isVerified !== undefined ? props.user.isVerified : false,
       profileImage: props.user.profileImage || '',
       roles: props.user.roles || [],
+      permissions: props.user.permissions || [],
+      permissionCount: props.user.permissions?.length || 0,
+      loginCount: props.user.loginCount || 0,
+      accountAge,
+      lastLoginAt: props.user.lastLoginAt || null,
+      createdAt: props.user.createdAt || null,
+      updatedAt: props.user.updatedAt || null,
       mfaEnabled: props.user.mfaEnabled || false,
       isLocked: props.user.isLocked || false,
-      lastLogin: props.user.lastLogin || null,
       lastLoginIP: props.user.lastLoginIP || '',
       lastLoginLocation: props.user.lastLoginLocation || '',
     };
@@ -710,18 +751,24 @@ const loadUserData = () => {
 const resetForm = () => {
   formData.value = {
     id: '',
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
-    phone: '',
-    jobTitle: '',
-    department: '',
-    status: 'ACTIVE',
-    notes: '',
+    timezone: 'UTC',
+    language: 'en',
+    isActive: true,
+    isVerified: false,
     profileImage: '',
     roles: [],
+    permissions: [],
+    permissionCount: 0,
+    loginCount: 0,
+    accountAge: 0,
+    lastLoginAt: null,
+    createdAt: null,
+    updatedAt: null,
     mfaEnabled: false,
     isLocked: false,
-    lastLogin: null,
     lastLoginIP: '',
     lastLoginLocation: '',
   };
@@ -872,8 +919,13 @@ const saveUser = async () => {
 
     const result = {
       userId: formData.value.id || 'new-user-id',
-      userName: formData.value.name,
+      firstName: formData.value.firstName,
+      lastName: formData.value.lastName,
       email: formData.value.email,
+      timezone: formData.value.timezone,
+      language: formData.value.language,
+      isActive: formData.value.isActive,
+      isVerified: formData.value.isVerified,
       isNewUser: isNewUser.value,
       rolesAssigned: formData.value.roles.length,
       updatedAt: new Date(),
@@ -884,7 +936,7 @@ const saveUser = async () => {
     toast.add({
       severity: 'success',
       summary: isNewUser.value ? 'User Created' : 'User Updated',
-      detail: `${formData.value.name} has been ${isNewUser.value ? 'created' : 'updated'} successfully.`,
+      detail: `${fullName.value} has been ${isNewUser.value ? 'created' : 'updated'} successfully.`,
       life: 5000
     });
 

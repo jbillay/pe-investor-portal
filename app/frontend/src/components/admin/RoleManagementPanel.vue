@@ -84,7 +84,13 @@
       <Column selectionMode="multiple" headerStyle="width: 3rem" />
 
       <!-- Role Name and Details -->
-      <Column field="name" header="Role" :sortable="true" class="min-w-48">
+      <Column field="name" :sortable="true" class="min-w-48">
+        <template #header>
+          <div class="flex items-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-id-card text-blue-600"></i>
+            <span>Role Details</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <div class="flex items-center gap-3">
             <div
@@ -118,7 +124,13 @@
       </Column>
 
       <!-- Users Count -->
-      <Column field="userCount" header="Users" :sortable="true" class="text-center">
+      <Column field="userCount" :sortable="true" class="text-center">
+        <template #header>
+          <div class="flex items-center justify-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-users text-purple-600"></i>
+            <span>Assigned Users</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <div class="flex flex-col items-center">
             <span class="text-2xl font-bold text-blue-600">{{ data.userCount || 0 }}</span>
@@ -128,7 +140,13 @@
       </Column>
 
       <!-- Permissions Count -->
-      <Column field="permissionCount" header="Permissions" :sortable="true" class="text-center">
+      <Column field="permissionCount" :sortable="true" class="text-center">
+        <template #header>
+          <div class="flex items-center justify-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-shield text-green-600"></i>
+            <span>Permission Count</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <div class="flex flex-col items-center">
             <span class="text-2xl font-bold text-green-600">{{ data.permissionCount || 0 }}</span>
@@ -138,7 +156,13 @@
       </Column>
 
       <!-- Status -->
-      <Column field="status" header="Status" :sortable="true">
+      <Column field="status" :sortable="true">
+        <template #header>
+          <div class="flex items-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-circle text-emerald-600"></i>
+            <span>Role Status</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <Tag
             :value="data.status || 'ACTIVE'"
@@ -149,7 +173,13 @@
       </Column>
 
       <!-- Created Date -->
-      <Column field="createdAt" header="Created" :sortable="true">
+      <Column field="createdAt" :sortable="true">
+        <template #header>
+          <div class="flex items-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-calendar text-orange-600"></i>
+            <span>Date Created</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <div class="text-sm">
             <div class="text-gray-900">{{ formatDate(data.createdAt) }}</div>
@@ -159,7 +189,13 @@
       </Column>
 
       <!-- Actions -->
-      <Column header="Actions" class="min-w-40">
+      <Column class="min-w-40">
+        <template #header>
+          <div class="flex items-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-cog text-gray-600"></i>
+            <span>Actions</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <div class="flex items-center gap-2">
             <Button
@@ -679,7 +715,35 @@ onMounted(() => {
 }
 
 .role-datatable :deep(.p-datatable-thead > tr > th) {
-  @apply bg-gray-50 border-b border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-700 tracking-wider;
+  @apply bg-gradient-to-br from-slate-50 to-gray-100 text-gray-800 font-semibold border-b-2 border-gray-300;
+  padding: 16px 12px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  position: relative;
+}
+
+.role-datatable :deep(.p-datatable-thead > tr > th:hover) {
+  @apply bg-gradient-to-br from-blue-50 to-slate-100;
+  transition: all 0.2s ease-in-out;
+}
+
+.role-datatable :deep(.p-datatable-thead > tr > th:first-child) {
+  border-top-left-radius: 8px;
+}
+
+.role-datatable :deep(.p-datatable-thead > tr > th:last-child) {
+  border-top-right-radius: 8px;
+}
+
+.role-datatable :deep(.p-datatable-thead > tr > th .flex) {
+  @apply justify-start items-center;
+  font-weight: 600;
+}
+
+.role-datatable :deep(.p-datatable-thead > tr > th .pi) {
+  @apply mr-2;
+  font-size: 0.875rem;
 }
 
 .role-datatable :deep(.p-datatable-tbody > tr > td) {

@@ -1,90 +1,168 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { apiClient } from '@composables/useApi'
+import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
+import { apiClient } from '@composables/useApi';
 import type {
   User,
   LoginCredentials,
   LoginResponse,
-  RefreshTokenResponse
-} from '@/types/auth'
+  RefreshTokenResponse,
+} from '@/types/auth';
 
 export const useAuthStore = defineStore('auth', () => {
   // State
-  const user = ref<User | null>(null)
-  const accessToken = ref<string | null>(localStorage.getItem('accessToken'))
-  const refreshToken = ref<string | null>(localStorage.getItem('refreshToken'))
-  const isLoading = ref(false)
-  const error = ref<string | null>(null)
+  const user = ref<User | null>(null);
+  const accessToken = ref<string | null>(localStorage.getItem('accessToken'));
+  const refreshToken = ref<string | null>(localStorage.getItem('refreshToken'));
+  const isLoading = ref(false);
+  const error = ref<string | null>(null);
 
   // Getters
-  const isAuthenticated = computed(() => !!user.value && !!accessToken.value)
+  const isAuthenticated = computed(() => !!user.value && !!accessToken.value);
   const userInitials = computed(() => {
-    if (!user.value) return ''
-    return `${user.value.firstName.charAt(0)}${user.value.lastName.charAt(0)}`.toUpperCase()
-  })
+    if (!user.value) return '';
+    return `${user.value.firstName.charAt(0)}${user.value.lastName.charAt(0)}`.toUpperCase();
+  });
   const userFullName = computed(() => {
-    if (!user.value) return ''
-    return `${user.value.firstName} ${user.value.lastName}`
-  })
+    if (!user.value) return '';
+    return `${user.value.firstName} ${user.value.lastName}`;
+  });
+
+  // Helper functions to reduce code duplication
+  function parseApiResponse<T>(response: any, expectedProperty?: string): T {
+    if (response.status === 'success' && response.data) {
+      return response.data;
+    } else if (expectedProperty && (response as any)[expectedProperty]) {
+      return response as T;
+    } else if (!expectedProperty && (response as any).id) {
+      return response as T;
+    }
+    throw new Error(`Invalid API response format`);
+  }
+
+  async function fetchUserRolesAndPermissions(): Promise<{
+    roles: string[];
+    permissions: string[];
+  }> {
+    try {
+      console.log('Fetching user roles and permissions...');
+      const rolesResponse = await apiClient.get('admin/roles/me/roles');
+      console.log('User roles API response:', rolesResponse);
+
+      let rolesData: any;
+      try {
+        rolesData = parseApiResponse(rolesResponse, 'roles');
+      } catch {
+        console.warn('No roles data found in response, using empty roles');
+        rolesData = { roles: [], permissions: [] };
+      }
+
+      const roles =
+        rolesData.roles?.map((role: any) => role.name || role) || [];
+      const permissions =
+        rolesData.permissions?.map((perm: any) => perm.name || perm) || [];
+
+      return { roles, permissions };
+    } catch (rolesError: any) {
+      console.warn('Failed to fetch user roles:', rolesError);
+      return { roles: [], permissions: [] };
+    }
+  }
+
+  function updateUserWithRoles(
+    userData: User,
+    roles: string[],
+    permissions: string[],
+  ): User {
+    return {
+      ...userData,
+      roles,
+      permissions,
+    };
+  }
+
+  function saveUserToStorage(userData: User): void {
+    user.value = userData;
+    localStorage.setItem('user', JSON.stringify(userData));
+  }
+
+  function saveTokensToStorage(
+    accessTokenValue: string,
+    refreshTokenValue: string,
+  ): void {
+    accessToken.value = accessTokenValue;
+    refreshToken.value = refreshTokenValue;
+    localStorage.setItem('accessToken', accessTokenValue);
+    localStorage.setItem('refreshToken', refreshTokenValue);
+  }
 
   // Actions
   async function login(credentials: LoginCredentials): Promise<void> {
     try {
-      isLoading.value = true
-      error.value = null
+      isLoading.value = true;
+      error.value = null;
 
-      console.log('Making login API call...')
-      const response = await apiClient.post<LoginResponse>('/auth/login', credentials)
-      console.log('Login API response:', response)
+      console.log('Making login API call...');
+      const response = await apiClient.post<LoginResponse>(
+        '/auth/login',
+        credentials,
+      );
+      console.log('Login API response:', response);
 
-      // Handle both wrapped and direct API response formats
-      let userData: User, token: string, refresh: string
-
-      if (response.status === 'success' && response.data) {
-        // Wrapped format: { status: 'success', data: { user, accessToken, refreshToken } }
-        console.log('Using wrapped response format')
-        const loginData = response.data
-        userData = loginData.user
-        token = loginData.accessToken
-        refresh = loginData.refreshToken
-      } else if ((response as any).user && (response as any).accessToken) {
-        // Direct format: { user, accessToken, refreshToken, expiresIn }
-        console.log('Using direct response format')
-        const directResponse = response as any
-        userData = directResponse.user
-        token = directResponse.accessToken
-        refresh = directResponse.refreshToken
-      } else {
-        console.error('Login response format unexpected:', response)
-        throw new Error('Invalid login response format')
+      // Parse login response
+      let loginData: any;
+      try {
+        loginData = parseApiResponse(response, 'user');
+      } catch {
+        // Try direct format
+        if ((response as any).user && (response as any).accessToken) {
+          loginData = response;
+        } else {
+          console.error('Login response format unexpected:', response);
+          throw new Error('Invalid login response format');
+        }
       }
+
+      const {
+        user: userData,
+        accessToken: token,
+        refreshToken: refresh,
+      } = loginData;
 
       console.log('Setting auth state:', {
         userData,
         hasToken: !!token,
-        hasRefresh: !!refresh
-      })
+        hasRefresh: !!refresh,
+      });
 
-      user.value = userData
-      accessToken.value = token
-      refreshToken.value = refresh
+      // Save tokens first
+      saveTokensToStorage(token, refresh);
 
-      // Store tokens in localStorage
-      localStorage.setItem('accessToken', token)
-      localStorage.setItem('refreshToken', refresh)
-      localStorage.setItem('user', JSON.stringify(userData))
+      // Fetch user roles and permissions
+      const { roles, permissions } = await fetchUserRolesAndPermissions();
+
+      // Update user data with roles and permissions
+      const completeUserData = updateUserWithRoles(
+        userData,
+        roles,
+        permissions,
+      );
+
+      // Save complete user data
+      saveUserToStorage(completeUserData);
 
       console.log('Auth state updated:', {
         isAuthenticated: isAuthenticated.value,
         userSet: !!user.value,
-        tokenSet: !!accessToken.value
-      })
+        tokenSet: !!accessToken.value,
+        roles: completeUserData.roles,
+        permissions: completeUserData.permissions,
+      });
     } catch (err: any) {
-      console.error('Login API error:', err)
-      error.value = err.response?.data?.message || 'Login failed'
-      throw err
+      console.error('Login API error:', err);
+      error.value = err.response?.data?.message || 'Login failed';
+      throw err;
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
 
@@ -93,238 +171,207 @@ export const useAuthStore = defineStore('auth', () => {
       // Call logout endpoint if we have a token
       if (accessToken.value) {
         await apiClient.post('/auth/logout', {
-          refreshToken: refreshToken.value
-        })
+          refreshToken: refreshToken.value,
+        });
       }
     } catch (err) {
       // Continue with logout even if API call fails
-      console.warn('Logout API call failed:', err)
+      console.warn('Logout API call failed:', err);
     } finally {
       // Clear state and localStorage
-      user.value = null
-      accessToken.value = null
-      refreshToken.value = null
-      error.value = null
+      user.value = null;
+      accessToken.value = null;
+      refreshToken.value = null;
+      error.value = null;
 
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('user')
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
     }
   }
 
   async function refreshTokens(): Promise<void> {
     if (!refreshToken.value) {
-      throw new Error('No refresh token available')
+      throw new Error('No refresh token available');
     }
 
+    console.log('In refreshToken', refreshToken.value)
     try {
-      const response = await apiClient.post<RefreshTokenResponse>('/auth/refresh', {
-        refreshToken: refreshToken.value
-      })
+      console.log('Query /auth/refresh');
+      const response = await apiClient.post<RefreshTokenResponse>(
+        '/auth/refresh',
+        {
+          refreshToken: refreshToken.value,
+        },
+      );
+
+      console.log('Response from refresh token', response);
 
       if (response.status === 'success' && response.data) {
-        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+          response.data;
 
-        accessToken.value = newAccessToken
-        refreshToken.value = newRefreshToken
+        accessToken.value = newAccessToken;
+        refreshToken.value = newRefreshToken;
 
-        localStorage.setItem('accessToken', newAccessToken)
-        localStorage.setItem('refreshToken', newRefreshToken)
+        localStorage.setItem('accessToken', newAccessToken);
+        localStorage.setItem('refreshToken', newRefreshToken);
       }
     } catch (err) {
+      console.log('Response from refresh token failed', err);
       // If refresh fails, clear all auth data
-      await logout()
-      throw err
+      await logout();
+      throw err;
     }
   }
 
   async function getCurrentUser(): Promise<void> {
-    if (!accessToken.value) return
+    if (!accessToken.value) return;
 
     try {
-      isLoading.value = true
-      console.log('Fetching current user...')
+      isLoading.value = true;
+      console.log('In GetCurrentUser: Fetching current user...');
 
       // Fetch basic user profile
-      const profileResponse = await apiClient.get<User>('/auth/profile')
-      console.log('getCurrentUser API response:', profileResponse)
+      const profileResponse = await apiClient.get<User>('/auth/profile');
+      console.log('getCurrentUser API response:', profileResponse);
 
-      // Handle both wrapped and direct response formats for profile
-      let userData: User
-
-      if (profileResponse.status === 'success' && profileResponse.data) {
-        // Wrapped format
-        userData = profileResponse.data
-        console.log('Using wrapped format for getCurrentUser')
-      } else if ((profileResponse as any).id && (profileResponse as any).email) {
-        // Direct format (user object directly)
-        userData = profileResponse as any
-        console.log('Using direct format for getCurrentUser')
-      } else {
-        console.error('getCurrentUser response format unexpected:', profileResponse)
-        throw new Error('Invalid getCurrentUser response format')
-      }
+      // Parse profile response
+      const userData = parseApiResponse<User>(profileResponse);
 
       // Fetch user roles and permissions
-      try {
-        console.log('Fetching user roles and permissions...')
-        const rolesResponse = await apiClient.get('admin/roles/me/roles')
-        console.log('User roles API response:', rolesResponse)
+      const { roles, permissions } = await fetchUserRolesAndPermissions();
 
-        // Handle both wrapped and direct response formats for roles
-        let rolesData: any
+      // Update user data with roles and permissions
+      const completeUserData = updateUserWithRoles(
+        userData,
+        roles,
+        permissions,
+      );
 
-        if (rolesResponse.status === 'success' && rolesResponse.data) {
-          // Wrapped format
-          rolesData = rolesResponse.data
-        } else if ((rolesResponse as any).roles) {
-          // Direct format
-          rolesData = rolesResponse as any
-        } else {
-          console.warn('No roles data found in response, using empty roles')
-          rolesData = { roles: [], permissions: [] }
-        }
+      // Save complete user data
+      saveUserToStorage(completeUserData);
 
-        // Extract role names and permissions
-        const roles = rolesData.roles?.map((role: any) => role.name || role) || []
-        const permissions = rolesData.permissions?.map((perm: any) => perm.name || perm) || []
-
-        // Merge user data with roles and permissions
-        userData = {
-          ...userData,
-          roles,
-          permissions
-        }
-
-        console.log('User roles and permissions:', { roles, permissions })
-
-      } catch (rolesError: any) {
-        console.warn('Failed to fetch user roles, continuing without roles:', rolesError)
-        // Continue with basic user data even if roles fetch fails
-        userData = {
-          ...userData,
-          roles: [],
-          permissions: []
-        }
-      }
-
-      user.value = userData
-      localStorage.setItem('user', JSON.stringify(userData))
-      console.log('User data updated with roles:', userData)
-
+      console.log('User data updated with roles:', completeUserData);
     } catch (err: any) {
-      console.error('getCurrentUser API error:', err)
-      error.value = err.response?.data?.message || 'Failed to get user data'
+      console.error('getCurrentUser API error:', err);
+      error.value = err.response?.data?.message || 'Failed to get user data';
       // If getting current user fails, tokens might be invalid
       if (err.response?.status === 401) {
-        console.log('Token invalid, logging out...')
-        await logout()
+        console.log('Token invalid, logging out...');
+        await logout();
       } else {
         // For non-401 errors, don't logout - just throw the error
-        throw err
+        throw err;
       }
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
 
   async function updateProfile(profileData: Partial<User>): Promise<void> {
     try {
-      isLoading.value = true
-      error.value = null
+      isLoading.value = true;
+      error.value = null;
 
-      const response = await apiClient.patch<User>('/auth/profile', profileData)
+      const response = await apiClient.patch<User>(
+        '/auth/profile',
+        profileData,
+      );
+      const updatedUserData = parseApiResponse<User>(response);
 
-      if (response.status === 'success' && response.data) {
-        user.value = response.data
-        localStorage.setItem('user', JSON.stringify(response.data))
-      }
+      // Preserve existing roles and permissions when updating profile
+      const completeUserData = user.value
+        ? {
+            ...updatedUserData,
+            roles: user.value.roles,
+            permissions: user.value.permissions,
+          }
+        : updatedUserData;
+
+      saveUserToStorage(completeUserData);
     } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to update profile'
-      throw err
+      error.value = err.response?.data?.message || 'Failed to update profile';
+      throw err;
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
 
   // Initialize auth state from localStorage
   function initializeAuth(): void {
-    const storedUser = localStorage.getItem('user')
+    const storedUser = localStorage.getItem('user');
     if (storedUser && accessToken.value) {
       try {
-        const parsedUser = JSON.parse(storedUser)
-        user.value = parsedUser
+        const parsedUser = JSON.parse(storedUser);
+        user.value = parsedUser;
         console.log('Auth initialized from localStorage:', {
           userId: parsedUser.id,
           email: parsedUser.email,
           roles: parsedUser.roles,
-          isAuthenticated: isAuthenticated.value
-        })
+          isAuthenticated: isAuthenticated.value,
+        });
       } catch (err) {
-        console.warn('Failed to parse stored user data:', err)
-        logout()
+        console.warn('Failed to parse stored user data:', err);
+        logout();
       }
     } else {
-      console.log('No stored user data or access token found')
+      console.log('No stored user data or access token found');
     }
   }
 
   // Refresh user roles and permissions only
   async function refreshUserRoles(): Promise<void> {
-    if (!accessToken.value || !user.value) return
+    if (!accessToken.value || !user.value) return;
 
     try {
-      console.log('Refreshing user roles and permissions...')
-      const rolesResponse = await apiClient.get('/roles/me/roles')
-      console.log('User roles refresh response:', rolesResponse)
+      console.log('Refreshing user roles and permissions...');
 
-      // Handle both wrapped and direct response formats for roles
-      let rolesData: any
+      // Note: Different endpoint than fetchUserRolesAndPermissions
+      const rolesResponse = await apiClient.get('/roles/me/roles');
+      console.log('User roles refresh response:', rolesResponse);
 
-      if (rolesResponse.status === 'success' && rolesResponse.data) {
-        // Wrapped format
-        rolesData = rolesResponse.data
-      } else if ((rolesResponse as any).roles) {
-        // Direct format
-        rolesData = rolesResponse as any
-      } else {
-        console.warn('No roles data found in response, using empty roles')
-        rolesData = { roles: [], permissions: [] }
+      let rolesData: any;
+      try {
+        rolesData = parseApiResponse(rolesResponse, 'roles');
+      } catch {
+        console.warn('No roles data found in response, using empty roles');
+        rolesData = { roles: [], permissions: [] };
       }
 
-      // Extract role names and permissions
-      const roles = rolesData.roles?.map((role: any) => role.name || role) || []
-      const permissions = rolesData.permissions?.map((perm: any) => perm.name || perm) || []
+      const roles =
+        rolesData.roles?.map((role: any) => role.name || role) || [];
+      const permissions =
+        rolesData.permissions?.map((perm: any) => perm.name || perm) || [];
 
       // Update user data with new roles and permissions
-      user.value = {
-        ...user.value,
+      const updatedUserData = updateUserWithRoles(
+        user.value,
         roles,
-        permissions
-      }
+        permissions,
+      );
+      saveUserToStorage(updatedUserData);
 
-      localStorage.setItem('user', JSON.stringify(user.value))
-      console.log('User roles refreshed:', { roles, permissions })
-
+      console.log('User roles refreshed:', { roles, permissions });
     } catch (rolesError: any) {
-      console.warn('Failed to refresh user roles:', rolesError)
+      console.warn('Failed to refresh user roles:', rolesError);
       // Don't throw error, just log it
     }
   }
 
   // Check if user has a specific role
   function hasRole(roleName: string): boolean {
-    return user.value?.roles?.includes(roleName) || false
+    return user.value?.roles?.includes(roleName) || false;
   }
 
   // Check if user has a specific permission
   function hasPermission(permissionName: string): boolean {
-    return user.value?.permissions?.includes(permissionName) || false
+    return user.value?.permissions?.includes(permissionName) || false;
   }
 
   // Clear any auth errors
   function clearError(): void {
-    error.value = null
+    error.value = null;
   }
 
   return {
@@ -350,6 +397,6 @@ export const useAuthStore = defineStore('auth', () => {
     refreshUserRoles,
     hasRole,
     hasPermission,
-    clearError
-  }
-})
+    clearError,
+  };
+});

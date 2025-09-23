@@ -14,6 +14,7 @@ import {
   ParseBoolPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
+import { ParseCuidPipe } from '../../common/pipes/parse-cuid.pipe';
 import { Request } from 'express';
 import {
   ApiTags,
@@ -122,7 +123,7 @@ export class RoleController {
   @ApiParam({ name: 'id', description: 'Role ID' })
   @AdminOnly()
   @Get(':id')
-  async getRoleById(@Param('id') roleId: string): Promise<RoleResponseDto> {
+  async getRoleById(@Param('id', ParseCuidPipe) roleId: string): Promise<RoleResponseDto> {
     return this.roleService.getRoleById(roleId);
   }
 
@@ -139,7 +140,7 @@ export class RoleController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'name', description: 'Role name' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Get('name/:name')
   async getRoleByName(@Param('name') name: string): Promise<RoleResponseDto> {
     return this.roleService.getRoleByName(name);
@@ -163,7 +164,7 @@ export class RoleController {
   @AdminOnly()
   @Put(':id')
   async updateRole(
-    @Param('id') roleId: string,
+    @Param('id', ParseCuidPipe) roleId: string,
     @Body() updateRoleDto: UpdateRoleDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<RoleResponseDto> {
@@ -187,7 +188,7 @@ export class RoleController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteRole(
-    @Param('id') roleId: string,
+    @Param('id', ParseCuidPipe) roleId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
     return this.roleService.deleteRole(roleId, user.id);
@@ -329,7 +330,7 @@ export class RoleController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'userId', description: 'User ID' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Get('user/:userId')
   async getUserRoles(@Param('userId') userId: string): Promise<UserWithRolesResponseDto> {
     return this.roleService.getUserRoles(userId);
@@ -385,7 +386,7 @@ export class RoleController {
   })
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Get('default')
   async getDefaultRole(): Promise<RoleResponseDto | null> {
     return this.roleService.getDefaultRole();
@@ -431,7 +432,7 @@ export class RoleController {
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiParam({ name: 'roleName', description: 'Role name to check' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Get('check/:userId/:roleName')
   async checkUserRole(
     @Param('userId') userId: string,

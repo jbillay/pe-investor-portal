@@ -28,6 +28,7 @@ import {
   InvestmentResponseDto,
   InvestmentSummaryDto,
 } from '../dto/investment.dto';
+import { ParseCuidPipe } from '../../common/pipes/parse-cuid.pipe';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../auth/interfaces/auth.interface';
@@ -101,11 +102,11 @@ export class InvestmentController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiNotFoundResponse({ description: 'Investment not found' })
-  @ApiParam({ name: 'id', description: 'Investment ID' })
+  @ApiParam({ name: 'id', description: 'Investment ID (CUID format)', example: 'cljk0x5a10001qz6z9k8z9k8z' })
   @Get(':id')
   async getInvestmentById(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', ParseCuidPipe) id: string,
   ): Promise<InvestmentResponseDto> {
     return this.investmentService.getInvestmentById(user.id, id);
   }
@@ -150,11 +151,11 @@ export class InvestmentController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiNotFoundResponse({ description: 'Investment not found' })
-  @ApiParam({ name: 'id', description: 'Investment ID' })
+  @ApiParam({ name: 'id', description: 'Investment ID (CUID format)', example: 'cljk0x5a10001qz6z9k8z9k8z' })
   @Get(':id/performance')
   async getInvestmentPerformance(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', ParseCuidPipe) id: string,
   ) {
     return this.investmentService.getInvestmentPerformance(user.id, id);
   }
@@ -170,12 +171,12 @@ export class InvestmentController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiNotFoundResponse({ description: 'Investment not found' })
-  @ApiParam({ name: 'id', description: 'Investment ID' })
+  @ApiParam({ name: 'id', description: 'Investment ID (CUID format)', example: 'cljk0x5a10001qz6z9k8z9k8z' })
   @ApiBody({ type: UpdateInvestmentDto })
   @Put(':id')
   async updateInvestment(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Body() updateInvestmentDto: UpdateInvestmentDto,
   ): Promise<InvestmentResponseDto> {
     return this.investmentService.updateInvestment(user.id, id, updateInvestmentDto);
@@ -191,12 +192,12 @@ export class InvestmentController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiNotFoundResponse({ description: 'Investment not found' })
-  @ApiParam({ name: 'id', description: 'Investment ID' })
+  @ApiParam({ name: 'id', description: 'Investment ID (CUID format)', example: 'cljk0x5a10001qz6z9k8z9k8z' })
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteInvestment(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', ParseCuidPipe) id: string,
   ): Promise<void> {
     return this.investmentService.deleteInvestment(user.id, id);
   }

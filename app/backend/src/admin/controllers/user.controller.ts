@@ -11,7 +11,6 @@ import {
   UseGuards,
   HttpStatus,
   HttpCode,
-  ParseUUIDPipe,
   ValidationPipe,
   UseInterceptors,
   ClassSerializerInterceptor,
@@ -40,9 +39,10 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
 import { RequirePermissions } from '../decorators/permissions.decorator';
-import { RequireRoles } from '../decorators/roles.decorator';
+import { RequireRoles, RequireAnyRole } from '../decorators/roles.decorator';
 import { AuditLog } from '../../common/decorators/audit-log.decorator';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { ParseCuidPipe } from '../../common/pipes/parse-cuid.pipe';
 
 import {
   CreateUserDto,
@@ -141,7 +141,7 @@ export class UserController {
     description: 'Forbidden - Insufficient permissions'
   })
   @RequirePermissions('USER_READ')
-  @RequireRoles('SUPER_ADMIN', 'FUND_MANAGER', 'COMPLIANCE_OFFICER')
+  @RequireAnyRole('SUPER_ADMIN', 'FUND_MANAGER', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_LIST_ACCESSED')
   async findAll(
     @Query(new ValidationPipe({ transform: true })) query: QueryUsersDto,
@@ -177,7 +177,7 @@ export class UserController {
     type: UserStatsResponseDto
   })
   @RequirePermissions('ANALYTICS_READ')
-  @RequireRoles('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
+  @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_STATS_ACCESSED')
   async getStats(
     @Query(new ValidationPipe({ transform: true })) query: UserStatsQueryDto,
@@ -190,7 +190,7 @@ export class UserController {
   /**
    * Get detailed information about a specific user
    *
-   * @param id - User UUID
+   * @param id - User CUID
    * @returns Detailed user information including profile, roles, and statistics
    */
   @Get(':id')
@@ -209,8 +209,8 @@ export class UserController {
   })
   @ApiParam({
     name: 'id',
-    description: 'User UUID',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
   })
   @ApiResponse({
     status: 200,
@@ -224,7 +224,7 @@ export class UserController {
   @RequirePermissions('USER_READ')
   @AuditLog('USER_DETAILS_ACCESSED')
   async findOne(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Request() req: AuthenticatedRequest
   ): Promise<DetailedUserResponseDto> {
     this.logger.log(`User ${req.user.id} requested details for user ${id}`);
@@ -268,7 +268,7 @@ export class UserController {
   })
   @HttpCode(HttpStatus.CREATED)
   @RequirePermissions('USER_CREATE')
-  @RequireRoles('SUPER_ADMIN', 'FUND_MANAGER')
+  @RequireAnyRole('SUPER_ADMIN', 'FUND_MANAGER')
   @RateLimit({ limit: 10, window: 300 }) // 10 requests per 5 minutes
   @AuditLog('USER_CREATED')
   async create(
@@ -282,7 +282,7 @@ export class UserController {
   /**
    * Update user information
    *
-   * @param id - User UUID
+   * @param id - User CUID
    * @param updateUserDto - Updated user data
    * @returns Updated user information
    */
@@ -303,8 +303,8 @@ export class UserController {
   })
   @ApiParam({
     name: 'id',
-    description: 'User UUID',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
   })
   @ApiResponse({
     status: 200,
@@ -322,7 +322,7 @@ export class UserController {
   @RequirePermissions('USER_UPDATE')
   @AuditLog('USER_UPDATED')
   async update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Body(ValidationPipe) updateUserDto: UpdateUserDto,
     @Request() req: AuthenticatedRequest
   ): Promise<DetailedUserResponseDto> {
@@ -333,7 +333,7 @@ export class UserController {
   /**
    * Update user status (activate/deactivate)
    *
-   * @param id - User UUID
+   * @param id - User CUID
    * @param updateStatusDto - Status update data
    * @returns Updated user information
    */
@@ -353,8 +353,8 @@ export class UserController {
   })
   @ApiParam({
     name: 'id',
-    description: 'User UUID',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
   })
   @ApiResponse({
     status: 200,
@@ -369,11 +369,11 @@ export class UserController {
     status: 404,
     description: 'User not found'
   })
-  @RequirePermissions('USER_STATUS_UPDATE')
-  @RequireRoles('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
+  @RequirePermissions('USER_UPDATE')
+  @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_STATUS_CHANGED')
   async updateStatus(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Body(ValidationPipe) updateStatusDto: UpdateUserStatusDto,
     @Request() req: AuthenticatedRequest
   ): Promise<UserResponseDto> {
@@ -384,7 +384,7 @@ export class UserController {
   /**
    * Update user email verification status
    *
-   * @param id - User UUID
+   * @param id - User CUID
    * @param updateVerificationDto - Verification update data
    * @returns Updated user information
    */
@@ -403,8 +403,8 @@ export class UserController {
   })
   @ApiParam({
     name: 'id',
-    description: 'User UUID',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
   })
   @ApiResponse({
     status: 200,
@@ -412,10 +412,10 @@ export class UserController {
     type: UserResponseDto
   })
   @RequirePermissions('USER_VERIFY')
-  @RequireRoles('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
+  @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_VERIFICATION_CHANGED')
   async updateVerification(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Body(ValidationPipe) updateVerificationDto: UpdateUserVerificationDto,
     @Request() req: AuthenticatedRequest
   ): Promise<UserResponseDto> {
@@ -426,7 +426,7 @@ export class UserController {
   /**
    * Reset user password
    *
-   * @param id - User UUID
+   * @param id - User CUID
    * @param resetPasswordDto - Password reset data
    * @returns Success confirmation
    */
@@ -447,8 +447,8 @@ export class UserController {
   })
   @ApiParam({
     name: 'id',
-    description: 'User UUID',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
   })
   @ApiResponse({
     status: 200,
@@ -463,7 +463,7 @@ export class UserController {
   @RateLimit({ limit: 5, window: 300 }) // 5 requests per 5 minutes
   @AuditLog('USER_PASSWORD_RESET')
   async resetPassword(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Body(ValidationPipe) resetPasswordDto: ResetPasswordDto,
     @Request() req: AuthenticatedRequest
   ): Promise<{ message: string; temporaryPassword?: string }> {
@@ -474,7 +474,7 @@ export class UserController {
   /**
    * Get user role assignments
    *
-   * @param id - User UUID
+   * @param id - User CUID
    * @param query - Query parameters for role filtering
    * @returns User's current and historical role assignments
    */
@@ -494,17 +494,17 @@ export class UserController {
   })
   @ApiParam({
     name: 'id',
-    description: 'User UUID',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
   })
   @ApiResponse({
     status: 200,
     description: 'Successfully retrieved user roles'
   })
-  @RequirePermissions('USER_ROLES_READ')
+  @RequirePermissions('USER_READ')
   @AuditLog('USER_ROLES_ACCESSED')
   async getUserRoles(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Query(new ValidationPipe({ transform: true })) query: QueryUserRolesDto,
     @Request() req: AuthenticatedRequest
   ) {
@@ -515,7 +515,7 @@ export class UserController {
   /**
    * Assign roles to a user
    *
-   * @param id - User UUID
+   * @param id - User CUID
    * @param assignRolesDto - Role assignment data
    * @returns Updated role assignments
    */
@@ -536,8 +536,8 @@ export class UserController {
   })
   @ApiParam({
     name: 'id',
-    description: 'User UUID',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
   })
   @ApiResponse({
     status: 200,
@@ -548,10 +548,10 @@ export class UserController {
     description: 'Invalid roles or assignment conflict'
   })
   @RequirePermissions('USER_ROLES_ASSIGN')
-  @RequireRoles('SUPER_ADMIN', 'FUND_MANAGER')
+  @RequireAnyRole('SUPER_ADMIN', 'FUND_MANAGER')
   @AuditLog('USER_ROLES_ASSIGNED')
   async assignRoles(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Body(ValidationPipe) assignRolesDto: AssignRolesDto,
     @Request() req: AuthenticatedRequest
   ) {
@@ -562,7 +562,7 @@ export class UserController {
   /**
    * Revoke roles from a user
    *
-   * @param id - User UUID
+   * @param id - User CUID
    * @param revokeRolesDto - Role revocation data
    * @returns Updated role assignments
    */
@@ -583,8 +583,8 @@ export class UserController {
   })
   @ApiParam({
     name: 'id',
-    description: 'User UUID',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
   })
   @ApiResponse({
     status: 200,
@@ -595,10 +595,10 @@ export class UserController {
     description: 'Cannot revoke role - user must have at least one role'
   })
   @RequirePermissions('USER_ROLES_REVOKE')
-  @RequireRoles('SUPER_ADMIN', 'FUND_MANAGER')
+  @RequireAnyRole('SUPER_ADMIN', 'FUND_MANAGER')
   @AuditLog('USER_ROLES_REVOKED')
   async revokeRoles(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Body(ValidationPipe) revokeRolesDto: RevokeRolesDto,
     @Request() req: AuthenticatedRequest
   ) {
@@ -652,7 +652,7 @@ export class UserController {
   /**
    * Soft delete a user account
    *
-   * @param id - User UUID
+   * @param id - User CUID
    * @returns Deletion confirmation
    */
   @Delete(':id')
@@ -673,8 +673,8 @@ export class UserController {
   })
   @ApiParam({
     name: 'id',
-    description: 'User UUID',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
   })
   @ApiResponse({
     status: 200,
@@ -692,7 +692,7 @@ export class UserController {
   @RequireRoles('SUPER_ADMIN')
   @AuditLog('USER_DELETED')
   async remove(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Request() req: AuthenticatedRequest
   ): Promise<{ message: string; deactivatedAt: string }> {
     this.logger.log(`User ${req.user.id} deleting user ${id}`);
@@ -726,7 +726,7 @@ export class UserController {
     description: 'Export file generated successfully'
   })
   @RequirePermissions('DATA_EXPORT')
-  @RequireRoles('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
+  @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @RateLimit({ limit: 2, window: 3600 }) // 2 exports per hour
   @AuditLog('USER_DATA_EXPORTED')
   async exportUsers(

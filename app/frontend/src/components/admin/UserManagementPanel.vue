@@ -37,23 +37,6 @@
           />
         </div>
       </template>
-
-      <template #end>
-        <div class="flex gap-3">
-          <Button
-            label="Export Users"
-            icon="pi pi-download"
-            class="p-button-outlined"
-            @click="exportUsers"
-          />
-
-          <Button
-            label="Invite User"
-            icon="pi pi-user-plus"
-            @click="showInviteDialog = true"
-          />
-        </div>
-      </template>
     </Toolbar>
 
     <!-- Users DataTable -->
@@ -80,7 +63,13 @@
       <Column selectionMode="multiple" headerStyle="width: 3rem" />
 
       <!-- Avatar and User Info Column -->
-      <Column field="user" header="User" :sortable="false" style="min-width: 250px">
+      <Column field="user" :sortable="false" style="min-width: 250px">
+        <template #header>
+          <div class="flex items-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-user text-blue-600"></i>
+            <span>User Profile</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <div class="flex items-center gap-3">
             <Avatar
@@ -92,7 +81,11 @@
             />
             <div class="flex flex-col">
               <span class="font-semibold text-gray-900">
-                {{ data.firstName }} {{ data.lastName }}
+                {{
+                  data.fullName ||
+                  `${data.firstName} ${data.lastName}`.trim() ||
+                  'No Name'
+                }}
               </span>
               <span class="text-sm text-gray-500">{{ data.email }}</span>
               <div class="flex items-center gap-2 mt-1">
@@ -113,7 +106,13 @@
       </Column>
 
       <!-- Roles Column -->
-      <Column field="roles" header="Roles" style="min-width: 200px">
+      <Column field="roles" style="min-width: 200px">
+        <template #header>
+          <div class="flex items-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-shield text-purple-600"></i>
+            <span>Assigned Roles</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <div class="flex flex-wrap gap-1">
             <Chip
@@ -134,13 +133,16 @@
       </Column>
 
       <!-- Permissions Count -->
-      <Column field="permissionCount" header="Permissions" style="min-width: 120px">
+      <Column field="permissionCount" style="min-width: 120px">
+        <template #header>
+          <div class="flex items-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-key text-green-600"></i>
+            <span>Permissions</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <div class="flex items-center gap-2">
-            <Badge
-              :value="data.effectivePermissions?.length || 0"
-              severity="info"
-            />
+            <Badge :value="data.permissionCount || 0" severity="info" />
             <Button
               icon="pi pi-eye"
               class="p-button-text p-button-sm"
@@ -152,7 +154,13 @@
       </Column>
 
       <!-- Last Login -->
-      <Column field="lastLoginAt" header="Last Login" style="min-width: 150px">
+      <Column field="lastLoginAt" style="min-width: 150px">
+        <template #header>
+          <div class="flex items-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-clock text-orange-600"></i>
+            <span>Last Access</span>
+          </div>
+        </template>
         <template #body="{ data }">
           <div class="flex flex-col">
             <span v-if="data.lastLoginAt" class="text-sm">
@@ -166,24 +174,14 @@
         </template>
       </Column>
 
-      <!-- Investment Activity -->
-      <Column field="investmentActivity" header="Activity" style="min-width: 120px">
-        <template #body="{ data }">
-          <div class="flex flex-col items-center">
-            <ProgressBar
-              :value="getActivityScore(data)"
-              class="w-16 h-2 mb-1"
-              :showValue="false"
-            />
-            <span class="text-xs text-gray-600">
-              {{ data.investmentCount || 0 }} investments
-            </span>
+      <!-- Actions Column -->
+      <Column style="min-width: 120px">
+        <template #header>
+          <div class="flex items-center gap-2 text-gray-700 font-semibold">
+            <i class="pi pi-cog text-gray-600"></i>
+            <span>Actions</span>
           </div>
         </template>
-      </Column>
-
-      <!-- Actions Column -->
-      <Column header="Actions" style="min-width: 120px">
         <template #body="{ data }">
           <div class="flex gap-1">
             <Button
@@ -212,12 +210,18 @@
     </DataTable>
 
     <!-- Selection Summary -->
-    <div v-if="selectedUsers.length > 0" class="selection-summary mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+    <div
+      v-if="selectedUsers.length > 0"
+      class="selection-summary mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200"
+    >
       <div class="flex justify-between items-center">
         <div class="flex items-center gap-3">
           <i class="pi pi-info-circle text-blue-600"></i>
           <span class="text-blue-800 font-medium">
-            {{ selectedUsers.length }} user{{ selectedUsers.length > 1 ? 's' : '' }} selected
+            {{ selectedUsers.length }} user{{
+              selectedUsers.length > 1 ? 's' : ''
+            }}
+            selected
           </span>
         </div>
         <div class="flex gap-2">
@@ -243,22 +247,6 @@
       </div>
     </div>
 
-    <!-- User Invite Dialog -->
-    <Dialog
-      v-model:visible="showInviteDialog"
-      header="Invite New User"
-      :modal="true"
-      class="w-96"
-    >
-      <div class="p-4">
-        <p class="text-gray-600 mb-4">User invitation functionality will be implemented here.</p>
-        <div class="flex justify-end gap-2">
-          <Button label="Cancel" class="p-button-outlined" @click="showInviteDialog = false" />
-          <Button label="Send Invite" @click="handleUserInvited" />
-        </div>
-      </div>
-    </Dialog>
-
     <!-- User Permissions Dialog -->
     <Dialog
       v-model:visible="showPermissionsDialog"
@@ -267,14 +255,40 @@
       class="w-5/6 max-w-4xl"
     >
       <div class="p-4">
-        <p class="text-gray-600 mb-4">Permissions for {{ selectedPermissionUser?.firstName }} {{ selectedPermissionUser?.lastName }}</p>
-        <div v-if="selectedPermissionUser?.roles" class="space-y-2">
-          <div v-for="role in selectedPermissionUser.roles" :key="role.id" class="p-3 bg-gray-50 rounded">
-            <h4 class="font-medium">{{ role.name }}</h4>
-            <p class="text-sm text-gray-600">{{ role.description }}</p>
+        <p class="text-gray-600 mb-4">
+          Permissions for
+          {{
+            selectedPermissionUser?.fullName ||
+            `${selectedPermissionUser?.firstName || ''} ${selectedPermissionUser?.lastName || ''}`.trim() ||
+            selectedPermissionUser?.email
+          }}
+        </p>
+        <div
+          v-if="selectedPermissionUser?.permissions?.length"
+          class="space-y-2"
+        >
+          <div
+            v-for="permission in selectedPermissionUser.permissions"
+            :key="permission.id"
+            class="p-3 bg-gray-50 rounded"
+          >
+            <h4 class="font-medium">{{ permission.name }}</h4>
+            <p class="text-sm text-gray-600">
+              {{ permission.description || 'No description available' }}
+            </p>
+            <p class="text-xs text-gray-500 mt-1">
+              Assigned: {{ formatDate(permission.updatedAt) }}
+            </p>
+            <div class="mt-2">
+              <Tag
+                :value="permission.isActive ? 'Active' : 'Inactive'"
+                :severity="getPermissionStatusSeverity(permission.isActive)"
+                class="text-xs"
+              />
+            </div>
           </div>
         </div>
-        <div v-else class="text-gray-500">No roles assigned</div>
+        <div v-else class="text-gray-500">No Permission assigned</div>
       </div>
     </Dialog>
   </div>
@@ -285,6 +299,8 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
 import { FilterMatchMode } from 'primevue/api';
+import { useApi } from '@/composables/useApi';
+import type { PaginatedUsersResponseDto } from '@/types/admin';
 
 // PrimeVue Components
 import Button from 'primevue/button';
@@ -294,12 +310,7 @@ import InputText from 'primevue/inputtext';
 import Dropdown from 'primevue/dropdown';
 import Tag from 'primevue/tag';
 import Avatar from 'primevue/avatar';
-import Card from 'primevue/card';
-import ProgressSpinner from 'primevue/progressspinner';
 import Dialog from 'primevue/dialog';
-import Divider from 'primevue/divider';
-import OverlayPanel from 'primevue/overlaypanel';
-import MultiSelect from 'primevue/multiselect';
 
 // Define props and emits
 const props = defineProps<{
@@ -323,14 +334,15 @@ const showInviteDialog = ref(false);
 const showPermissionsDialog = ref(false);
 const selectedPermissionUser = ref(null);
 
-// Toast and confirm
+// Toast, confirm, and API
 const toast = useToast();
 const confirm = useConfirm();
+const { api } = useApi();
 
 // Computed
 const selectedUsers = computed({
   get: () => props.selectedUsers,
-  set: (value) => emit('update:selectedUsers', value)
+  set: (value) => emit('update:selectedUsers', value),
 });
 
 const filteredUsers = computed(() => {
@@ -339,31 +351,32 @@ const filteredUsers = computed(() => {
   // Apply search filter
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
-    result = result.filter(user =>
-      user.firstName?.toLowerCase().includes(query) ||
-      user.lastName?.toLowerCase().includes(query) ||
-      user.email?.toLowerCase().includes(query) ||
-      user.roles?.some(role => role.name.toLowerCase().includes(query))
+    result = result.filter(
+      (user) =>
+        user.firstName?.toLowerCase().includes(query) ||
+        user.lastName?.toLowerCase().includes(query) ||
+        user.email?.toLowerCase().includes(query) ||
+        user.roles?.some((role) => role.name.toLowerCase().includes(query)),
     );
   }
 
   // Apply role filter
   if (selectedRoleFilter.value) {
-    result = result.filter(user =>
-      user.roles?.some(role => role.name === selectedRoleFilter.value)
+    result = result.filter((user) =>
+      user.roles?.some((role) => role.name === selectedRoleFilter.value),
     );
   }
 
   // Apply status filter
   if (selectedStatusFilter.value) {
     if (selectedStatusFilter.value === 'active') {
-      result = result.filter(user => user.isActive);
+      result = result.filter((user) => user.isActive);
     } else if (selectedStatusFilter.value === 'inactive') {
-      result = result.filter(user => !user.isActive);
+      result = result.filter((user) => !user.isActive);
     } else if (selectedStatusFilter.value === 'verified') {
-      result = result.filter(user => user.isVerified);
+      result = result.filter((user) => user.isVerified);
     } else if (selectedStatusFilter.value === 'unverified') {
-      result = result.filter(user => !user.isVerified);
+      result = result.filter((user) => !user.isVerified);
     }
   }
 
@@ -377,14 +390,14 @@ const roleFilterOptions = ref([
   { label: 'Investor', value: 'INVESTOR' },
   { label: 'Compliance Officer', value: 'COMPLIANCE_OFFICER' },
   { label: 'Analyst', value: 'ANALYST' },
-  { label: 'Viewer', value: 'VIEWER' }
+  { label: 'Viewer', value: 'VIEWER' },
 ]);
 
 const statusFilterOptions = ref([
   { label: 'Active', value: 'active' },
   { label: 'Inactive', value: 'inactive' },
   { label: 'Verified', value: 'verified' },
-  { label: 'Unverified', value: 'unverified' }
+  { label: 'Unverified', value: 'unverified' },
 ]);
 
 // Lifecycle
@@ -396,81 +409,223 @@ onMounted(async () => {
 const loadUsers = async () => {
   loading.value = true;
   try {
-    // Mock data for development - replace with actual API when backend is ready
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+    // Fetch users list first
+    const response = await api.get<PaginatedUsersResponseDto>('/admin/users', {
+      params: {
+        page: 1,
+        limit: 100, // Load more users for the admin panel
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        includeProfile: true,
+        includeStats: true,
+      },
+    });
 
-    users.value = [
-      {
-        id: '1',
-        firstName: 'Jeremy',
-        lastName: 'Billay',
-        email: 'john.doe@example.com',
-        roles: ['SUPER_ADMIN'],
-        status: 'ACTIVE',
-        lastLogin: '2025-01-15T10:30:00Z',
-        createdAt: '2024-01-10T08:00:00Z',
-        avatar: null
-      },
-      {
-        id: '2',
-        firstName: 'Jane',
-        lastName: 'Smith',
-        email: 'jane.smith@example.com',
-        roles: ['FUND_MANAGER'],
-        status: 'ACTIVE',
-        lastLogin: '2025-01-14T16:45:00Z',
-        createdAt: '2024-02-15T09:30:00Z',
-        avatar: null
-      },
-      {
-        id: '3',
-        firstName: 'Bob',
-        lastName: 'Johnson',
-        email: 'bob.johnson@example.com',
-        roles: ['ANALYST'],
-        status: 'ACTIVE',
-        lastLogin: '2025-01-13T14:20:00Z',
-        createdAt: '2024-03-01T11:15:00Z',
-        avatar: null
-      },
-      {
-        id: '4',
-        firstName: 'Alice',
-        lastName: 'Williams',
-        email: 'alice.williams@example.com',
-        roles: ['COMPLIANCE_OFFICER'],
-        status: 'INACTIVE',
-        lastLogin: '2025-01-10T09:00:00Z',
-        createdAt: '2024-04-12T13:45:00Z',
-        avatar: null
-      },
-      {
-        id: '5',
-        firstName: 'Charlie',
-        lastName: 'Brown',
-        email: 'charlie.brown@example.com',
-        roles: ['INVESTOR'],
-        status: 'PENDING',
-        lastLogin: null,
-        createdAt: '2025-01-14T15:30:00Z',
-        avatar: null
+    console.log('API Response:', response);
+
+    // Validate response structure
+    if (!response || !response.data) {
+      throw new Error('Invalid response structure: missing data');
+    }
+
+    // Handle different possible response structures
+    let userData;
+    if (response.data.data) {
+      // Standard paginated response
+      userData = response.data.data;
+    } else if (Array.isArray(response.data)) {
+      // Direct array response
+      userData = response.data;
+    } else {
+      throw new Error('Invalid response structure: data is not an array');
+    }
+
+    if (!Array.isArray(userData)) {
+      throw new Error(`Expected array but got ${typeof userData}`);
+    }
+
+    // Fetch roles and permissions for each user individually
+    const usersWithRoles = await Promise.allSettled(
+      userData.map(async (user: any) => {
+        try {
+          // Fetch user roles using the dedicated endpoint
+          const rolesResponse = await api.get(`/admin/users/${user.id}/roles`, {
+            params: {
+              activeOnly: true,
+              includeHistory: false,
+            },
+          });
+
+          // Fix roles data mapping - check different possible response structures
+          let roles = [];
+          if (rolesResponse?.data?.roles) {
+            roles = rolesResponse.data.roles;
+          } else if (rolesResponse?.roles) {
+            roles = rolesResponse.roles;
+          } else if (Array.isArray(rolesResponse?.data)) {
+            roles = rolesResponse.data;
+          } else if (Array.isArray(rolesResponse)) {
+            roles = rolesResponse;
+          }
+
+          // Normalize role data structure
+          roles = roles.map((role: any) => ({
+            id: role.role.id,
+            name: role.role.name,
+            description: role.role.description,
+            assignedAt: role.role.updatedAt || role.role.createdAt,
+            isActive: role.role.isActive !== false,
+          }));
+
+          // Fetch user permissions count
+          const permissionsResponse = await api.get(
+            `/admin/permissions/user/${user.id}`,
+          );
+
+          let permissionCount = 0;
+          let permissions = [];
+          if (permissionsResponse?.data?.permissions) {
+            permissionCount = permissionsResponse.data.permissions.length;
+            permissions = permissionsResponse.data.permissions;
+          } else if (permissionsResponse?.permissions) {
+            permissionCount = permissionsResponse.permissions.length;
+            permissions = permissionsResponse.permissions;
+          } else if (Array.isArray(permissionsResponse?.data)) {
+            permissionCount = permissionsResponse.data.length;
+            permissions = permissionsResponse.data;
+          } else if (Array.isArray(permissionsResponse)) {
+            permissionCount = permissionsResponse.length;
+            permissions = permissionsResponse;
+          }
+
+          return {
+            id: user.id,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            fullName:
+              user.fullName ||
+              `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+            email: user.email,
+            isActive: user.isActive,
+            isVerified: user.isVerified,
+            lastLoginAt: user.lastLogin,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            phone: user.profile?.phone || null,
+            timezone: user.profile?.timezone || 'UTC',
+            language: user.profile?.language || 'en',
+            roles: roles,
+            permissions: permissions,
+            permissionCount: permissionCount,
+            loginCount: user.stats?.loginCount || 0,
+            accountAge: user.stats?.accountAge || 0,
+          };
+        } catch (roleError) {
+          console.warn(`Failed to fetch roles for user ${user.id}:`, roleError);
+
+          // Return user data without roles if role fetch fails
+          return {
+            id: user.id,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            fullName:
+              user.fullName ||
+              `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+            email: user.email,
+            isActive: user.isActive,
+            isVerified: user.isVerified,
+            lastLoginAt: user.lastLogin,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            avatar: user.profile?.avatar || null,
+            phone: user.profile?.phone || null,
+            timezone: user.profile?.timezone || 'UTC',
+            language: user.profile?.language || 'en',
+            roles: [], // Empty roles array if fetch failed
+            permissions: [], // Empty roles array if fetch failed
+            permissionCount: 0, // Default to 0 if fetch failed
+            loginCount: user.stats?.loginCount || 0,
+            accountAge: user.stats?.accountAge || 0,
+          };
+        }
+      }),
+    );
+
+    // Extract successful results and handle failures
+    users.value = usersWithRoles.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      } else {
+        console.error(
+          `Failed to process user ${userData[index]?.id}:`,
+          result.reason,
+        );
+        // Return basic user data for failed cases
+        const user = userData[index];
+        return {
+          id: user.id,
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          fullName:
+            user.fullName ||
+            `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+          email: user.email,
+          isActive: user.isActive,
+          isVerified: user.isVerified,
+          lastLoginAt: user.lastLogin,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          avatar: user.profile?.avatar || null,
+          phone: user.profile?.phone || null,
+          timezone: user.profile?.timezone || 'UTC',
+          language: user.profile?.language || 'en',
+          roles: [],
+          permissions: [],
+          permissionCount: 0, // Default to 0 if fetch failed
+          loginCount: user.stats?.loginCount || 0,
+          accountAge: user.stats?.accountAge || 0,
+        };
       }
-    ];
+    });
+
+    // Count how many users had their roles successfully loaded
+    const successfulRoleFetches = usersWithRoles.filter(
+      (result) => result.status === 'fulfilled',
+    ).length;
+    const failedRoleFetches = usersWithRoles.length - successfulRoleFetches;
+
+    let detail = `Successfully loaded ${users.value.length} users`;
+    if (failedRoleFetches > 0) {
+      detail += ` (${failedRoleFetches} users had role fetch issues)`;
+    }
 
     toast.add({
-      severity: 'success',
+      severity: failedRoleFetches > 0 ? 'warn' : 'success',
       summary: 'Users Loaded',
-      detail: `Successfully loaded ${users.value.length} users`,
-      life: 2000
+      detail: detail,
+      life: 3000,
     });
   } catch (error) {
     console.error('Error loading users:', error);
+
+    // More detailed error information
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: 'Failed to load users',
-      life: 3000
+      detail:
+        error instanceof Error
+          ? error.message
+          : 'Failed to load users from server',
+      life: 5000,
     });
+
+    // Set empty array as fallback
+    users.value = [];
   } finally {
     loading.value = false;
   }
@@ -487,19 +642,24 @@ const applyFilters = () => {
 const getUserInitials = (user: any) => {
   const first = user.firstName?.charAt(0) || '';
   const last = user.lastName?.charAt(0) || '';
-  return (first + last).toUpperCase() || user.email?.charAt(0).toUpperCase() || '?';
+  const initials = (first + last).trim();
+  return initials.toUpperCase() || user.email?.charAt(0).toUpperCase() || '?';
 };
 
 const getRoleChipClass = (roleName: string) => {
   const classes = {
-    'SUPER_ADMIN': 'bg-red-100 text-red-800',
-    'FUND_MANAGER': 'bg-blue-100 text-blue-800',
-    'COMPLIANCE_OFFICER': 'bg-purple-100 text-purple-800',
-    'ANALYST': 'bg-green-100 text-green-800',
-    'INVESTOR': 'bg-yellow-100 text-yellow-800',
-    'VIEWER': 'bg-gray-100 text-gray-800'
+    SUPER_ADMIN: 'bg-red-100 text-red-800',
+    FUND_MANAGER: 'bg-blue-100 text-blue-800',
+    COMPLIANCE_OFFICER: 'bg-purple-100 text-purple-800',
+    ANALYST: 'bg-green-100 text-green-800',
+    INVESTOR: 'bg-yellow-100 text-yellow-800',
+    VIEWER: 'bg-gray-100 text-gray-800',
   };
   return classes[roleName] || 'bg-gray-100 text-gray-800';
+};
+
+const getPermissionStatusSeverity = (isActive: boolean) => {
+  return isActive ? 'success' : 'danger';
 };
 
 const formatDate = (date: string) => {
@@ -509,7 +669,9 @@ const formatDate = (date: string) => {
 const formatRelativeTime = (date: string) => {
   const now = new Date();
   const loginDate = new Date(date);
-  const diffInHours = Math.floor((now.getTime() - loginDate.getTime()) / (1000 * 60 * 60));
+  const diffInHours = Math.floor(
+    (now.getTime() - loginDate.getTime()) / (1000 * 60 * 60),
+  );
 
   if (diffInHours < 24) {
     return `${diffInHours}h ago`;
@@ -531,26 +693,26 @@ const getUserActions = (user: any) => {
     {
       label: 'View Profile',
       icon: 'pi pi-user',
-      command: () => handleUserAction(user, 'view')
+      command: () => handleUserAction(user, 'view'),
     },
     {
       label: 'View Permissions',
       icon: 'pi pi-key',
-      command: () => viewUserPermissions(user)
+      command: () => viewUserPermissions(user),
     },
     {
       label: 'Reset Password',
       icon: 'pi pi-lock',
-      command: () => handleUserAction(user, 'reset-password')
+      command: () => handleUserAction(user, 'reset-password'),
     },
     {
-      separator: true
+      separator: true,
     },
     {
       label: user.isActive ? 'Deactivate' : 'Activate',
       icon: user.isActive ? 'pi pi-ban' : 'pi pi-check',
-      command: () => toggleUserStatus(user)
-    }
+      command: () => toggleUserStatus(user),
+    },
   ];
 };
 
@@ -572,7 +734,11 @@ const viewUserPermissions = (user: any) => {
 
 const toggleUserStatus = (user: any) => {
   const action = user.isActive ? 'deactivate' : 'activate';
-  const message = `Are you sure you want to ${action} ${user.firstName} ${user.lastName}?`;
+  const userName =
+    user.fullName ||
+    `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
+    user.email;
+  const message = `Are you sure you want to ${action} ${userName}?`;
 
   confirm.require({
     message,
@@ -581,12 +747,7 @@ const toggleUserStatus = (user: any) => {
     accept: async () => {
       try {
         // API call to toggle user status
-        await fetch(`/api/admin/users/${user.id}/toggle-status`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-          }
-        });
+        await api.put(`/admin/users/${user.id}/toggle-status`);
 
         user.isActive = !user.isActive;
 
@@ -594,17 +755,17 @@ const toggleUserStatus = (user: any) => {
           severity: 'success',
           summary: 'Success',
           detail: `User ${action}d successfully`,
-          life: 3000
+          life: 3000,
         });
       } catch (error) {
         toast.add({
           severity: 'error',
           summary: 'Error',
           detail: `Failed to ${action} user`,
-          life: 3000
+          life: 3000,
         });
       }
-    }
+    },
   });
 };
 
@@ -615,28 +776,23 @@ const resetUserPassword = (user: any) => {
     icon: 'pi pi-key',
     accept: async () => {
       try {
-        await fetch(`/api/admin/users/${user.id}/reset-password`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-          }
-        });
+        await api.post(`/admin/users/${user.id}/reset-password`);
 
         toast.add({
           severity: 'success',
           summary: 'Password Reset Sent',
           detail: `Reset email sent to ${user.email}`,
-          life: 3000
+          life: 3000,
         });
       } catch (error) {
         toast.add({
           severity: 'error',
           summary: 'Error',
           detail: 'Failed to send password reset email',
-          life: 3000
+          life: 3000,
         });
       }
-    }
+    },
   });
 };
 
@@ -669,7 +825,7 @@ const handleUserInvited = () => {
     severity: 'success',
     summary: 'User Invited',
     detail: 'Invitation sent successfully',
-    life: 3000
+    life: 3000,
   });
 };
 </script>
@@ -688,7 +844,35 @@ const handleUserInvited = () => {
 }
 
 .user-data-table :deep(.p-datatable-thead > tr > th) {
-  @apply bg-gray-50 text-gray-700 font-semibold border-b border-gray-200;
+  @apply bg-gradient-to-br from-slate-50 to-gray-100 text-gray-800 font-semibold border-b-2 border-gray-300;
+  padding: 16px 12px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  position: relative;
+}
+
+.user-data-table :deep(.p-datatable-thead > tr > th:hover) {
+  @apply bg-gradient-to-br from-blue-50 to-slate-100;
+  transition: all 0.2s ease-in-out;
+}
+
+.user-data-table :deep(.p-datatable-thead > tr > th:first-child) {
+  border-top-left-radius: 8px;
+}
+
+.user-data-table :deep(.p-datatable-thead > tr > th:last-child) {
+  border-top-right-radius: 8px;
+}
+
+.user-data-table :deep(.p-datatable-thead > tr > th .flex) {
+  @apply justify-start items-center;
+  font-weight: 600;
+}
+
+.user-data-table :deep(.p-datatable-thead > tr > th .pi) {
+  @apply mr-2;
+  font-size: 0.875rem;
 }
 
 .user-data-table :deep(.p-datatable-tbody > tr:hover) {

@@ -163,6 +163,28 @@
       </main>
     </div>
 
+        <!-- User Invite Dialog -->
+    <Dialog
+      v-model:visible="showInviteDialog"
+      header="Invite New User"
+      :modal="true"
+      class="w-96"
+    >
+      <div class="p-4">
+        <p class="text-gray-600 mb-4">
+          User invitation functionality will be implemented here.
+        </p>
+        <div class="flex justify-end gap-2">
+          <Button
+            label="Cancel"
+            class="p-button-outlined"
+            @click="showInviteDialog = false"
+          />
+          <Button label="Send Invite" @click="handleUserInvited" />
+        </div>
+      </div>
+    </Dialog>
+
     <!-- Role Assignment Dialog -->
     <RoleAssignmentDialog
       v-model:visible="roleAssignmentVisible"
@@ -208,6 +230,7 @@ import { useAuthStore } from '../../stores/auth';
 // PrimeVue Components
 import Breadcrumb from 'primevue/breadcrumb';
 import Button from 'primevue/button';
+import Dialog from 'primevue/dialog';
 
 // Import all child components
 import UserManagementPanel from '@/components/admin/UserManagementPanel.vue';
@@ -234,6 +257,7 @@ const selectedUser = ref(null);
 const selectedRole = ref(null);
 
 // Dialog visibility
+const showInviteDialog = ref(false);
 const roleAssignmentVisible = ref(false);
 const showBulkDialog = ref(false);
 const permissionDialogVisible = ref(false);
@@ -280,7 +304,7 @@ const currentSectionActions = computed(() => {
         label: 'Invite User',
         icon: 'pi pi-user-plus',
         class: 'p-button-primary',
-        handler: () => console.log('Invite user'),
+        handler: () => { showInviteDialog.value = true },
         disabled: false
       },
       {
@@ -476,19 +500,44 @@ const handleUserUpdated = (result: any) => {
 
 const checkSystemHealth = async () => {
   try {
-    // API call to check system health
-    const response = await fetch('/health', {
+    // API call to check system health - health endpoint is excluded from /api prefix
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5173';
+    const healthUrl = `${baseUrl}/health`;
+
+    const response = await fetch(healthUrl, {
       headers: {
-        Authorization: `Bearer ${authStore.accessToken}`
+        'Content-Type': 'application/json'
       }
     });
 
     if (response.ok) {
       const health = await response.json();
       console.log('System health:', health);
+      toast.add({
+        severity: 'success',
+        summary: 'System Health Check',
+        detail: `System is running normally (${health.service} v${health.version})`,
+        life: 3000
+      });
+    } else {
+      throw new Error(`Health check failed: ${response.status} ${response.statusText}`);
     }
   } catch (error) {
     console.error('Failed to check system health:', error);
+
+    let errorMessage = 'Unable to verify system health';
+    if (error instanceof Error) {
+      errorMessage = error.message.includes('fetch')
+        ? 'Cannot connect to backend server'
+        : error.message;
+    }
+
+    toast.add({
+      severity: 'error',
+      summary: 'Health Check Failed',
+      detail: errorMessage,
+      life: 5000
+    });
   }
 };
 

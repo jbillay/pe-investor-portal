@@ -1,364 +1,624 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setActivePinia, createPinia } from 'pinia';
-import { useAuthStore } from './auth';
-import { TestHelper, MockApiClient } from '../test/utils/test-helpers';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
+import { mockUser, mockLoginResponse, mockLocalStorage } from '../__tests__/utils/test-utils'
 
-// Mock the API client
-const mockApiClient = MockApiClient.createMockImplementation();
-vi.mock('../services/api', () => ({
-  apiClient: {
-    auth: mockApiClient,
-  },
-}));
+// Mock API client
+const mockApiClient = {
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+  patch: vi.fn(),
+  delete: vi.fn()
+}
+
+// Mock the API client module
+vi.mock('@composables/useApi', () => ({
+  apiClient: mockApiClient
+}))
+
+// Import after mocking
+const { useAuthStore } = await import('./auth')
 
 describe('Auth Store', () => {
-  let authStore: ReturnType<typeof useAuthStore>;
+  let authStore: ReturnType<typeof useAuthStore>
+  let mockStorage: ReturnType<typeof mockLocalStorage>
 
   beforeEach(() => {
-    setActivePinia(createPinia());
-    authStore = useAuthStore();
-    vi.clearAllMocks();
-    localStorage.clear();
-  });
+    setActivePinia(createPinia())
 
-  describe('initial state', () => {
+    // Mock localStorage
+    mockStorage = mockLocalStorage()
+    Object.defineProperty(window, 'localStorage', {
+      value: mockStorage,
+      writable: true
+    })
+
+    // Clear all mocks
+    vi.clearAllMocks()
+
+    // Create fresh store instance after clearing mocks
+    authStore = useAuthStore()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  describe('Initial State', () => {
     it('should have correct initial state', () => {
-      expect(authStore.user).toBeNull();
-      expect(authStore.accessToken).toBeNull();
-      expect(authStore.refreshToken).toBeNull();
-      expect(authStore.isAuthenticated).toBe(false);
-      expect(authStore.isLoading).toBe(false);
-      expect(authStore.error).toBeNull();
-    });
-  });
+      expect(authStore.user).toBeNull()
+      expect(authStore.accessToken).toBeNull()
+      expect(authStore.refreshToken).toBeNull()
+      expect(authStore.isLoading).toBe(false)
+      expect(authStore.error).toBeNull()
+      expect(authStore.isAuthenticated).toBe(false)
+    })
 
-  describe('login', () => {
-    it('should login successfully', async () => {
-      const loginData = { email: 'test@example.com', password: 'password' };
-      const mockResponse = {
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-        user: TestHelper.generateMockUser(),
-        expiresIn: 900,
-      };
+    it('should initialize with stored tokens', () => {
+      // Mock localStorage with stored tokens
+      mockStorage.getItem.mockImplementation((key: string) => {
+        switch (key) {
+          case 'accessToken': return 'stored-access-token'
+          case 'refreshToken': return 'stored-refresh-token'
+          case 'user': return JSON.stringify(mockUser)
+          default: return null
+        }
+      })
 
-      mockApiClient.login.mockResolvedValueOnce({ data: mockResponse });
+      // Create new store instance to trigger initialization
+      setActivePinia(createPinia())
+      const newAuthStore = useAuthStore()
 
-      await authStore.login(loginData);
+      expect(newAuthStore.accessToken).toBe('stored-access-token')
+      expect(newAuthStore.refreshToken).toBe('stored-refresh-token')
+    })
+  })
 
-      expect(mockApiClient.login).toHaveBeenCalledWith(loginData);
-      expect(authStore.user).toEqual(mockResponse.user);
-      expect(authStore.accessToken).toBe(mockResponse.accessToken);
-      expect(authStore.refreshToken).toBe(mockResponse.refreshToken);
-      expect(authStore.isAuthenticated).toBe(true);
-      expect(authStore.error).toBeNull();
-      expect(authStore.isLoading).toBe(false);
-    });
+  describe('Computed Properties', () => {
+    beforeEach(() => {
+      // Set up authenticated state
+      authStore.user = mockUser
+      authStore.accessToken = 'test-token'
+    })
 
-    it('should handle login errors', async () => {
-      const loginData = { email: 'test@example.com', password: 'wrongpassword' };
-      const mockError = {
-        response: {
-          data: { message: 'Invalid credentials' },
-          status: 401,
-        },
-      };
+    it('should compute isAuthenticated correctly', () => {
+      expect(authStore.isAuthenticated).toBe(true)
 
-      mockApiClient.login.mockRejectedValueOnce(mockError);
+      authStore.user = null
+      expect(authStore.isAuthenticated).toBe(false)
 
-      await expect(authStore.login(loginData)).rejects.toEqual(mockError);
+      authStore.user = mockUser
+      authStore.accessToken = null
+      expect(authStore.isAuthenticated).toBe(false)
+    })
 
-      expect(authStore.user).toBeNull();
-      expect(authStore.accessToken).toBeNull();
-      expect(authStore.refreshToken).toBeNull();
-      expect(authStore.isAuthenticated).toBe(false);
-      expect(authStore.error).toBe('Invalid credentials');
-      expect(authStore.isLoading).toBe(false);
-    });
+    it('should compute userInitials correctly', () => {
+      expect(authStore.userInitials).toBe('JD') // John Doe
+
+      authStore.user = null
+      expect(authStore.userInitials).toBe('')
+    })
+
+    it('should compute userFullName correctly', () => {
+      expect(authStore.userFullName).toBe('John Doe')
+
+      authStore.user = null
+      expect(authStore.userFullName).toBe('')
+    })
+  })
+
+  describe('Login Action', () => {
+    const loginCredentials = {
+      email: 'test@example.com',
+      password: 'password123'
+    }
+
+    const mockRolesResponse = {
+      status: 'success' as const,
+      data: {
+        roles: [{ name: 'INVESTOR' }, { name: 'USER' }],
+        permissions: [{ name: 'READ_PROFILE' }, { name: 'UPDATE_PROFILE' }]
+      }
+    }
+
+    it('should login successfully with roles and permissions', async () => {
+      mockApiClient.post.mockResolvedValue(mockLoginResponse)
+      mockApiClient.get.mockResolvedValue(mockRolesResponse)
+
+      await authStore.login(loginCredentials)
+
+      expect(mockApiClient.post).toHaveBeenCalledWith('/auth/login', loginCredentials)
+      expect(mockApiClient.get).toHaveBeenCalledWith('admin/roles/me/roles')
+
+      expect(authStore.user).toEqual({
+        ...mockUser,
+        roles: ['INVESTOR', 'USER'],
+        permissions: ['READ_PROFILE', 'UPDATE_PROFILE']
+      })
+      expect(authStore.accessToken).toBe('mock-access-token')
+      expect(authStore.refreshToken).toBe('mock-refresh-token')
+      expect(authStore.error).toBeNull()
+      expect(authStore.isLoading).toBe(false)
+
+      // Check localStorage calls
+      expect(mockStorage.setItem).toHaveBeenCalledWith('accessToken', 'mock-access-token')
+      expect(mockStorage.setItem).toHaveBeenCalledWith('refreshToken', 'mock-refresh-token')
+      expect(mockStorage.setItem).toHaveBeenCalledWith('user', JSON.stringify({
+        ...mockUser,
+        roles: ['INVESTOR', 'USER'],
+        permissions: ['READ_PROFILE', 'UPDATE_PROFILE']
+      }))
+    })
+
+    it('should login successfully even if roles fetch fails', async () => {
+      mockApiClient.post.mockResolvedValue(mockLoginResponse)
+      mockApiClient.get.mockRejectedValue(new Error('Roles fetch failed'))
+
+      await authStore.login(loginCredentials)
+
+      expect(authStore.user).toEqual({
+        ...mockUser,
+        roles: [],
+        permissions: []
+      })
+      expect(authStore.accessToken).toBe('mock-access-token')
+      expect(authStore.refreshToken).toBe('mock-refresh-token')
+    })
+
+    it('should handle direct response format', async () => {
+      const directLoginResponse = {
+        user: mockUser,
+        accessToken: 'direct-access-token',
+        refreshToken: 'direct-refresh-token'
+      }
+
+      mockApiClient.post.mockResolvedValue(directLoginResponse)
+      mockApiClient.get.mockResolvedValue(mockRolesResponse)
+
+      await authStore.login(loginCredentials)
+
+      expect(authStore.accessToken).toBe('direct-access-token')
+      expect(authStore.refreshToken).toBe('direct-refresh-token')
+    })
+
+    it('should handle login failure', async () => {
+      const errorMessage = 'Invalid credentials'
+      mockApiClient.post.mockRejectedValue({
+        response: { data: { message: errorMessage } }
+      })
+
+      await expect(authStore.login(loginCredentials)).rejects.toThrow()
+
+      expect(authStore.user).toBeNull()
+      expect(authStore.error).toBe(errorMessage)
+      expect(authStore.isLoading).toBe(false)
+    })
 
     it('should set loading state during login', async () => {
-      const loginData = { email: 'test@example.com', password: 'password' };
+      let resolveLogin: (value: any) => void
+      const loginPromise = new Promise(resolve => {
+        resolveLogin = resolve
+      })
+      mockApiClient.post.mockReturnValue(loginPromise)
 
-      mockApiClient.login.mockImplementation(() => {
-        expect(authStore.isLoading).toBe(true);
-        return Promise.resolve({ data: {} });
-      });
+      const loginCall = authStore.login(loginCredentials)
 
-      await authStore.login(loginData);
+      expect(authStore.isLoading).toBe(true)
 
-      expect(authStore.isLoading).toBe(false);
-    });
-  });
+      resolveLogin!(mockLoginResponse)
+      await loginCall
 
-  describe('register', () => {
-    it('should register successfully', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password',
-        firstName: 'John',
-        lastName: 'Doe',
-      };
-      const mockResponse = {
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-        user: TestHelper.generateMockUser(),
-        expiresIn: 900,
-      };
+      expect(authStore.isLoading).toBe(false)
+    })
+  })
 
-      mockApiClient.register.mockResolvedValueOnce({ data: mockResponse });
-
-      await authStore.register(registerData);
-
-      expect(mockApiClient.register).toHaveBeenCalledWith(registerData);
-      expect(authStore.user).toEqual(mockResponse.user);
-      expect(authStore.accessToken).toBe(mockResponse.accessToken);
-      expect(authStore.refreshToken).toBe(mockResponse.refreshToken);
-      expect(authStore.isAuthenticated).toBe(true);
-    });
-
-    it('should handle registration errors', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password',
-        firstName: 'John',
-        lastName: 'Doe',
-      };
-      const mockError = {
-        response: {
-          data: { message: 'User already exists' },
-          status: 409,
-        },
-      };
-
-      mockApiClient.register.mockRejectedValueOnce(mockError);
-
-      await expect(authStore.register(registerData)).rejects.toEqual(mockError);
-
-      expect(authStore.error).toBe('User already exists');
-    });
-  });
-
-  describe('logout', () => {
-    beforeEach(async () => {
+  describe('Logout Action', () => {
+    beforeEach(() => {
       // Set up authenticated state
-      authStore.$patch({
-        user: TestHelper.generateMockUser(),
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-      });
-    });
+      authStore.user = mockUser
+      authStore.accessToken = 'test-token'
+      authStore.refreshToken = 'refresh-token'
+    })
 
     it('should logout successfully', async () => {
-      mockApiClient.logout.mockResolvedValueOnce({ data: { message: 'Logged out successfully' } });
+      mockApiClient.post.mockResolvedValue({ status: 'success' })
 
-      await authStore.logout();
+      await authStore.logout()
 
-      expect(mockApiClient.logout).toHaveBeenCalledWith({
-        refreshToken: 'mock-refresh-token',
-      });
-      expect(authStore.user).toBeNull();
-      expect(authStore.accessToken).toBeNull();
-      expect(authStore.refreshToken).toBeNull();
-      expect(authStore.isAuthenticated).toBe(false);
-    });
+      expect(mockApiClient.post).toHaveBeenCalledWith('/auth/logout', {
+        refreshToken: 'refresh-token'
+      })
+      expect(authStore.user).toBeNull()
+      expect(authStore.accessToken).toBeNull()
+      expect(authStore.refreshToken).toBeNull()
+      expect(authStore.error).toBeNull()
 
-    it('should clear state even if logout API fails', async () => {
-      mockApiClient.logout.mockRejectedValueOnce(new Error('Network error'));
+      // Check localStorage calls
+      expect(mockStorage.removeItem).toHaveBeenCalledWith('accessToken')
+      expect(mockStorage.removeItem).toHaveBeenCalledWith('refreshToken')
+      expect(mockStorage.removeItem).toHaveBeenCalledWith('user')
+    })
 
-      await authStore.logout();
+    it('should logout even if API call fails', async () => {
+      mockApiClient.post.mockRejectedValue(new Error('Network error'))
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      expect(authStore.user).toBeNull();
-      expect(authStore.accessToken).toBeNull();
-      expect(authStore.refreshToken).toBeNull();
-      expect(authStore.isAuthenticated).toBe(false);
-    });
-  });
+      await authStore.logout()
 
-  describe('refreshToken', () => {
+      expect(authStore.user).toBeNull()
+      expect(authStore.accessToken).toBeNull()
+      expect(authStore.refreshToken).toBeNull()
+      expect(consoleSpy).toHaveBeenCalledWith('Logout API call failed:', expect.any(Error))
+
+      consoleSpy.mockRestore()
+    })
+  })
+
+  describe('Refresh Token Action', () => {
     beforeEach(() => {
-      authStore.$patch({
-        refreshToken: 'mock-refresh-token',
-      });
-    });
+      authStore.refreshToken = 'valid-refresh-token'
+    })
 
     it('should refresh tokens successfully', async () => {
-      const mockResponse = {
-        accessToken: 'new-access-token',
-        refreshToken: 'new-refresh-token',
-        user: TestHelper.generateMockUser(),
-        expiresIn: 900,
-      };
+      const refreshResponse = {
+        status: 'success' as const,
+        data: {
+          accessToken: 'new-access-token',
+          refreshToken: 'new-refresh-token'
+        }
+      }
+      mockApiClient.post.mockResolvedValue(refreshResponse)
 
-      mockApiClient.refreshToken.mockResolvedValueOnce({ data: mockResponse });
+      await authStore.refreshTokens()
 
-      await authStore.refreshAccessToken();
+      expect(mockApiClient.post).toHaveBeenCalledWith('/auth/refresh', {
+        refreshToken: 'valid-refresh-token'
+      })
+      expect(authStore.accessToken).toBe('new-access-token')
+      expect(authStore.refreshToken).toBe('new-refresh-token')
 
-      expect(mockApiClient.refreshToken).toHaveBeenCalledWith({
-        refreshToken: 'mock-refresh-token',
-      });
-      expect(authStore.accessToken).toBe(mockResponse.accessToken);
-      expect(authStore.refreshToken).toBe(mockResponse.refreshToken);
-      expect(authStore.user).toEqual(mockResponse.user);
-    });
+      expect(mockStorage.setItem).toHaveBeenCalledWith('accessToken', 'new-access-token')
+      expect(mockStorage.setItem).toHaveBeenCalledWith('refreshToken', 'new-refresh-token')
+    })
 
-    it('should logout user if refresh fails', async () => {
-      mockApiClient.refreshToken.mockRejectedValueOnce(new Error('Invalid refresh token'));
+    it('should throw error if no refresh token available', async () => {
+      authStore.refreshToken = null
 
-      await authStore.refreshAccessToken();
+      await expect(authStore.refreshTokens()).rejects.toThrow('No refresh token available')
+    })
 
-      expect(authStore.user).toBeNull();
-      expect(authStore.accessToken).toBeNull();
-      expect(authStore.refreshToken).toBeNull();
-    });
-  });
+    it('should logout on refresh failure', async () => {
+      mockApiClient.post.mockRejectedValue(new Error('Refresh failed'))
 
-  describe('fetchProfile', () => {
+      // Mock logout to track if it's called
+      let logoutCalled = false
+      const originalLogout = authStore.logout
+      authStore.logout = vi.fn(async () => {
+        logoutCalled = true
+        return originalLogout.call(authStore)
+      })
+
+      await expect(authStore.refreshTokens()).rejects.toThrow()
+      expect(logoutCalled).toBe(true)
+
+      // Restore original method
+      authStore.logout = originalLogout
+    })
+  })
+
+  describe('Get Current User Action', () => {
     beforeEach(() => {
-      authStore.$patch({
-        accessToken: 'mock-access-token',
-      });
-    });
+      authStore.accessToken = 'valid-token'
+    })
 
-    it('should fetch user profile successfully', async () => {
-      const mockUser = TestHelper.generateMockUser();
-      mockApiClient.getProfile.mockResolvedValueOnce({ data: mockUser });
+    const mockRolesResponse = {
+      status: 'success' as const,
+      data: {
+        roles: [{ name: 'INVESTOR' }],
+        permissions: [{ name: 'READ_PROFILE' }]
+      }
+    }
 
-      await authStore.fetchProfile();
+    it('should get current user successfully with roles and permissions', async () => {
+      const userResponse = {
+        status: 'success' as const,
+        data: mockUser
+      }
+      mockApiClient.get
+        .mockResolvedValueOnce(userResponse) // profile call
+        .mockResolvedValueOnce(mockRolesResponse) // roles call
 
-      expect(mockApiClient.getProfile).toHaveBeenCalled();
-      expect(authStore.user).toEqual(mockUser);
-    });
+      await authStore.getCurrentUser()
 
-    it('should handle profile fetch errors', async () => {
-      const mockError = {
-        response: {
-          data: { message: 'Unauthorized' },
-          status: 401,
+      expect(mockApiClient.get).toHaveBeenCalledWith('/auth/profile')
+      expect(mockApiClient.get).toHaveBeenCalledWith('admin/roles/me/roles')
+
+      expect(authStore.user).toEqual({
+        ...mockUser,
+        roles: ['INVESTOR'],
+        permissions: ['READ_PROFILE']
+      })
+      expect(authStore.isLoading).toBe(false)
+      expect(mockStorage.setItem).toHaveBeenCalledWith('user', JSON.stringify({
+        ...mockUser,
+        roles: ['INVESTOR'],
+        permissions: ['READ_PROFILE']
+      }))
+    })
+
+    it('should handle direct response format', async () => {
+      const directUserResponse = {
+        ...mockUser,
+        id: mockUser.id,
+        email: mockUser.email
+      }
+
+      mockApiClient.get
+        .mockResolvedValueOnce(directUserResponse)
+        .mockResolvedValueOnce(mockRolesResponse)
+
+      await authStore.getCurrentUser()
+
+      expect(authStore.user).toEqual({
+        ...mockUser,
+        roles: ['INVESTOR'],
+        permissions: ['READ_PROFILE']
+      })
+    })
+
+    it('should not fetch user if no access token', async () => {
+      authStore.accessToken = null
+
+      await authStore.getCurrentUser()
+
+      expect(mockApiClient.get).not.toHaveBeenCalled()
+    })
+
+    it('should logout on 401 error', async () => {
+      mockApiClient.get.mockRejectedValue({
+        response: { status: 401, data: { message: 'Unauthorized' } }
+      })
+
+      // Mock logout to track if it's called
+      let logoutCalled = false
+      const originalLogout = authStore.logout
+      authStore.logout = vi.fn(async () => {
+        logoutCalled = true
+        return originalLogout.call(authStore)
+      })
+
+      await authStore.getCurrentUser()
+
+      expect(logoutCalled).toBe(true)
+      expect(authStore.error).toBe('Unauthorized')
+
+      // Restore original method
+      authStore.logout = originalLogout
+    })
+  })
+
+  describe('Update Profile Action', () => {
+    const profileData = {
+      firstName: 'Jane',
+      lastName: 'Smith'
+    }
+
+    it('should update profile successfully', async () => {
+      const updatedUser = { ...mockUser, ...profileData }
+      const updateResponse = {
+        status: 'success' as const,
+        data: updatedUser
+      }
+      mockApiClient.patch.mockResolvedValue(updateResponse)
+
+      await authStore.updateProfile(profileData)
+
+      expect(mockApiClient.patch).toHaveBeenCalledWith('/auth/profile', profileData)
+      expect(authStore.user).toEqual(updatedUser)
+      expect(authStore.isLoading).toBe(false)
+      expect(mockStorage.setItem).toHaveBeenCalledWith('user', JSON.stringify(updatedUser))
+    })
+
+    it('should handle update profile failure', async () => {
+      const errorMessage = 'Validation failed'
+      mockApiClient.patch.mockRejectedValue({
+        response: { data: { message: errorMessage } }
+      })
+
+      await expect(authStore.updateProfile(profileData)).rejects.toThrow()
+      expect(authStore.error).toBe(errorMessage)
+      expect(authStore.isLoading).toBe(false)
+    })
+  })
+
+  describe('Initialize Auth', () => {
+    it('should initialize with valid stored user data', () => {
+      // Set up localStorage mock to return stored data
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          getItem: vi.fn((key: string) => {
+            if (key === 'user') return JSON.stringify(mockUser)
+            if (key === 'accessToken') return 'stored-token'
+            if (key === 'refreshToken') return 'stored-refresh-token'
+            return null
+          }),
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
+          clear: vi.fn()
         },
-      };
+        writable: true
+      })
 
-      mockApiClient.getProfile.mockRejectedValueOnce(mockError);
+      // Create a new store instance that will use the mocked localStorage
+      setActivePinia(createPinia())
+      const newAuthStore = useAuthStore()
+      newAuthStore.initializeAuth()
 
-      await expect(authStore.fetchProfile()).rejects.toEqual(mockError);
-    });
-  });
+      expect(newAuthStore.user).toEqual(mockUser)
+    })
 
-  describe('token persistence', () => {
-    it('should save tokens to localStorage on login', async () => {
-      const mockResponse = {
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-        user: TestHelper.generateMockUser(),
-        expiresIn: 900,
-      };
+    it('should logout on invalid stored user data', () => {
+      // Mock logout to track if it's called
+      let logoutCalled = false
+      const originalLogout = authStore.logout
+      authStore.logout = vi.fn(async () => {
+        logoutCalled = true
+        return originalLogout.call(authStore)
+      })
 
-      mockApiClient.login.mockResolvedValueOnce({ data: mockResponse });
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      await authStore.login({ email: 'test@example.com', password: 'password' });
-
-      expect(localStorage.getItem('accessToken')).toBe(mockResponse.accessToken);
-      expect(localStorage.getItem('refreshToken')).toBe(mockResponse.refreshToken);
-      expect(JSON.parse(localStorage.getItem('user') || '{}')).toEqual(mockResponse.user);
-    });
-
-    it('should restore tokens from localStorage on initialization', () => {
-      const mockUser = TestHelper.generateMockUser();
-      localStorage.setItem('accessToken', 'stored-access-token');
-      localStorage.setItem('refreshToken', 'stored-refresh-token');
-      localStorage.setItem('user', JSON.stringify(mockUser));
-
-      authStore.initializeFromStorage();
-
-      expect(authStore.accessToken).toBe('stored-access-token');
-      expect(authStore.refreshToken).toBe('stored-refresh-token');
-      expect(authStore.user).toEqual(mockUser);
-      expect(authStore.isAuthenticated).toBe(true);
-    });
-
-    it('should clear localStorage on logout', async () => {
-      localStorage.setItem('accessToken', 'mock-access-token');
-      localStorage.setItem('refreshToken', 'mock-refresh-token');
-      localStorage.setItem('user', JSON.stringify(TestHelper.generateMockUser()));
-
-      mockApiClient.logout.mockResolvedValueOnce({ data: {} });
-
-      await authStore.logout();
-
-      expect(localStorage.getItem('accessToken')).toBeNull();
-      expect(localStorage.getItem('refreshToken')).toBeNull();
-      expect(localStorage.getItem('user')).toBeNull();
-    });
-  });
-
-  describe('computed properties', () => {
-    it('should compute isAuthenticated correctly', () => {
-      expect(authStore.isAuthenticated).toBe(false);
-
-      authStore.$patch({
-        accessToken: 'mock-access-token',
-        user: TestHelper.generateMockUser(),
-      });
-
-      expect(authStore.isAuthenticated).toBe(true);
-    });
-
-    it('should compute user display name correctly', () => {
-      const mockUser = TestHelper.generateMockUser();
-      authStore.$patch({ user: mockUser });
-
-      expect(authStore.userDisplayName).toBe(`${mockUser.firstName} ${mockUser.lastName}`);
-
-      // Test with null names
-      authStore.$patch({
-        user: { ...mockUser, firstName: null, lastName: null },
-      });
-
-      expect(authStore.userDisplayName).toBe(mockUser.email);
-    });
-  });
-
-  describe('error handling', () => {
-    it('should clear error on successful operations', async () => {
-      authStore.$patch({ error: 'Previous error' });
-
-      const mockResponse = {
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-        user: TestHelper.generateMockUser(),
-        expiresIn: 900,
-      };
-
-      mockApiClient.login.mockResolvedValueOnce({ data: mockResponse });
-
-      await authStore.login({ email: 'test@example.com', password: 'password' });
-
-      expect(authStore.error).toBeNull();
-    });
-
-    it('should set appropriate error messages', async () => {
-      const mockError = {
-        response: {
-          data: { message: 'Custom error message' },
-          status: 400,
+      // Set up localStorage to return invalid JSON
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          getItem: vi.fn((key: string) => {
+            if (key === 'user') return 'invalid-json'
+            if (key === 'accessToken') return 'stored-token'
+            return null
+          }),
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
+          clear: vi.fn()
         },
-      };
+        writable: true
+      })
 
-      mockApiClient.login.mockRejectedValueOnce(mockError);
+      authStore.initializeAuth()
 
-      await expect(authStore.login({ email: 'test@example.com', password: 'password' }))
-        .rejects.toEqual(mockError);
+      expect(logoutCalled).toBe(true)
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to parse stored user data:', expect.any(SyntaxError))
 
-      expect(authStore.error).toBe('Custom error message');
-    });
+      // Restore original method
+      authStore.logout = originalLogout
+      consoleSpy.mockRestore()
+    })
+  })
 
-    it('should handle network errors gracefully', async () => {
-      const networkError = new Error('Network Error');
-      mockApiClient.login.mockRejectedValueOnce(networkError);
+  describe('Role and Permission Checking', () => {
+    beforeEach(() => {
+      authStore.user = {
+        ...mockUser,
+        roles: ['INVESTOR', 'USER'],
+        permissions: ['READ_PROFILE', 'UPDATE_PROFILE']
+      }
+    })
 
-      await expect(authStore.login({ email: 'test@example.com', password: 'password' }))
-        .rejects.toEqual(networkError);
+    it('should check if user has role correctly', () => {
+      expect(authStore.hasRole('INVESTOR')).toBe(true)
+      expect(authStore.hasRole('ADMIN')).toBe(false)
+    })
 
-      expect(authStore.error).toBe('Network Error');
-    });
-  });
-});
+    it('should check if user has permission correctly', () => {
+      expect(authStore.hasPermission('READ_PROFILE')).toBe(true)
+      expect(authStore.hasPermission('DELETE_USER')).toBe(false)
+    })
+
+    it('should return false for roles/permissions when user is null', () => {
+      authStore.user = null
+
+      expect(authStore.hasRole('INVESTOR')).toBe(false)
+      expect(authStore.hasPermission('READ_PROFILE')).toBe(false)
+    })
+  })
+
+  describe('Refresh User Roles', () => {
+    beforeEach(() => {
+      authStore.accessToken = 'valid-token'
+      authStore.user = {
+        ...mockUser,
+        roles: ['OLD_ROLE'],
+        permissions: ['OLD_PERMISSION']
+      }
+    })
+
+    it('should refresh user roles successfully', async () => {
+      const rolesResponse = {
+        status: 'success' as const,
+        data: {
+          roles: [{ name: 'NEW_ROLE' }],
+          permissions: [{ name: 'NEW_PERMISSION' }]
+        }
+      }
+      mockApiClient.get.mockResolvedValue(rolesResponse)
+
+      await authStore.refreshUserRoles()
+
+      expect(mockApiClient.get).toHaveBeenCalledWith('/roles/me/roles')
+      expect(authStore.user?.roles).toEqual(['NEW_ROLE'])
+      expect(authStore.user?.permissions).toEqual(['NEW_PERMISSION'])
+    })
+
+    it('should handle refresh roles failure gracefully', async () => {
+      mockApiClient.get.mockRejectedValue(new Error('Failed to fetch'))
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      await authStore.refreshUserRoles()
+
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to refresh user roles:', expect.any(Error))
+      consoleSpy.mockRestore()
+    })
+
+    it('should not refresh if no token or user', async () => {
+      authStore.accessToken = null
+
+      await authStore.refreshUserRoles()
+
+      expect(mockApiClient.get).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Update Profile Action', () => {
+    const profileData = {
+      firstName: 'Jane',
+      lastName: 'Smith'
+    }
+
+    beforeEach(() => {
+      authStore.user = {
+        ...mockUser,
+        roles: ['INVESTOR'],
+        permissions: ['READ_PROFILE']
+      }
+    })
+
+    it('should update profile and preserve roles/permissions', async () => {
+      const updatedUser = { ...mockUser, ...profileData }
+      const updateResponse = {
+        status: 'success' as const,
+        data: updatedUser
+      }
+      mockApiClient.patch.mockResolvedValue(updateResponse)
+
+      await authStore.updateProfile(profileData)
+
+      expect(mockApiClient.patch).toHaveBeenCalledWith('/auth/profile', profileData)
+      expect(authStore.user).toEqual({
+        ...updatedUser,
+        roles: ['INVESTOR'],
+        permissions: ['READ_PROFILE']
+      })
+      expect(authStore.isLoading).toBe(false)
+    })
+
+    it('should handle update profile failure', async () => {
+      const errorMessage = 'Validation failed'
+      mockApiClient.patch.mockRejectedValue({
+        response: { data: { message: errorMessage } }
+      })
+
+      await expect(authStore.updateProfile(profileData)).rejects.toThrow()
+      expect(authStore.error).toBe(errorMessage)
+      expect(authStore.isLoading).toBe(false)
+    })
+  })
+
+  describe('Clear Error', () => {
+    it('should clear error', () => {
+      authStore.error = 'Some error'
+
+      authStore.clearError()
+
+      expect(authStore.error).toBeNull()
+    })
+  })
+})

@@ -15,6 +15,7 @@ import {
 } from '../interfaces/auth.interface';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
+import { Console } from 'console';
 
 @Injectable()
 export class AuthService {

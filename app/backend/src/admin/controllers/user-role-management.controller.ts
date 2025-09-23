@@ -168,7 +168,7 @@ export class UserRoleManagementController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'userId', description: 'User ID' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Post('initialize/:userId')
   async initializeUserPermissions(@Param('userId') userId: string) {
     await this.userRoleSetupService.initializeUserPermissions(userId);
@@ -226,7 +226,7 @@ export class UserRoleManagementController {
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiBody({ type: CheckUserAccessDto })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Post('check-access/:userId')
   async checkUserAccess(
     @Param('userId') userId: string,
@@ -296,7 +296,7 @@ export class UserRoleManagementController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'userId', description: 'User ID' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Get('effective-permissions/:userId')
   async getUserEffectivePermissions(@Param('userId') userId: string) {
     return this.userRoleSetupService.getUserEffectivePermissions(userId);

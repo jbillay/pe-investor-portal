@@ -111,7 +111,7 @@ export class RoleService {
       createdAt: role.createdAt,
       updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
-      permissions: role.rolePermissions.map(rp => rp.permission.name),
+      permissions: role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
     }));
   }
 
@@ -146,7 +146,7 @@ export class RoleService {
       createdAt: role.createdAt,
       updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
-      permissions: role.rolePermissions.map(rp => rp.permission.name),
+      permissions: role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
     };
   }
 
@@ -181,7 +181,7 @@ export class RoleService {
       createdAt: role.createdAt,
       updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
-      permissions: role.rolePermissions.map(rp => rp.permission.name),
+      permissions: role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
     };
   }
 
@@ -253,7 +253,7 @@ export class RoleService {
       createdAt: updatedRole.createdAt,
       updatedAt: updatedRole.updatedAt,
       userCount: updatedRole._count.userRoles,
-      permissions: updatedRole.rolePermissions.map(rp => rp.permission.name),
+      permissions: updatedRole.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
     };
   }
 
@@ -552,7 +552,7 @@ export class RoleService {
       isDefault: ur.role.isDefault,
       createdAt: ur.role.createdAt,
       updatedAt: ur.role.updatedAt,
-      permissions: ur.role.rolePermissions.map(rp => rp.permission.name),
+      permissions: ur.role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
     }));
 
     // Get all unique permissions from all roles
@@ -560,7 +560,9 @@ export class RoleService {
     user.userRoles.forEach(ur => {
       ur.role.rolePermissions.forEach(rp => {
         if (rp.isActive && rp.permission.isActive) {
-          allPermissions.add(rp.permission.name);
+          // Convert permission format from ROLE:ACTION to ROLE_ACTION
+          const formattedPermission = rp.permission.name.replace(':', '_');
+          allPermissions.add(formattedPermission);
         }
       });
     });
@@ -641,7 +643,7 @@ export class RoleService {
       createdAt: role.createdAt,
       updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
-      permissions: role.rolePermissions.map(rp => rp.permission.name),
+      permissions: role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
     };
   }
 
@@ -722,14 +724,14 @@ export class RoleService {
         isDefault: userRole.role.isDefault,
         createdAt: userRole.role.createdAt,
         updatedAt: userRole.role.updatedAt,
-        permissions: userRole.role.rolePermissions.map(rp => rp.permission.name),
+        permissions: userRole.role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
       }));
 
       const allPermissions = new Set<string>();
       ur.user.userRoles.forEach(userRole => {
         userRole.role.rolePermissions.forEach(rp => {
           if (rp.isActive && rp.permission.isActive) {
-            allPermissions.add(rp.permission.name);
+            allPermissions.add(rp.permission.name.replace(':', '_'));
           }
         });
       });

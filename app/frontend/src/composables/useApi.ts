@@ -4,6 +4,7 @@ import type { ApiResponse } from '@/types/api'
 
 class ApiClient {
   private instance: AxiosInstance
+  private refreshTokenPromise: Promise<any> | null = null
 
   constructor() {
     this.instance = axios.create({
@@ -30,26 +31,66 @@ class ApiClient {
       (error) => Promise.reject(error)
     )
 
-    // Response interceptor to handle token refresh
+    // Response interceptor to handle token refresh and better error messages
     this.instance.interceptors.response.use(
       (response) => response,
       async (error) => {
+        // Handle network errors (backend not available)
+        if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+          const enhancedError = new Error(
+            'Cannot connect to backend server. Please ensure the backend is running on port 5173.'
+          )
+          enhancedError.name = 'NetworkError'
+          return Promise.reject(enhancedError)
+        }
+
+        // Handle HTML responses (typically 404 or 500 errors returning HTML pages)
+        if (error.response?.status >= 400 &&
+            error.response?.headers['content-type']?.includes('text/html')) {
+          const enhancedError = new Error(
+            `Server error (${error.response.status}): Endpoint not found or server misconfigured`
+          )
+          enhancedError.name = 'ServerError'
+          return Promise.reject(enhancedError)
+        }
+
         const originalRequest = error.config
 
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true
 
+          // Don't try to refresh if this IS the refresh request - avoid infinite loop
+          if (originalRequest.url?.includes('/auth/refresh')) {
+            const authStore = useAuthStore()
+            authStore.logout()
+            window.location.href = '/login'
+            return Promise.reject(error)
+          }
+
           const authStore = useAuthStore()
+
+          // If a refresh is already in progress, wait for it instead of starting a new one
+          if (!this.refreshTokenPromise) {
+            this.refreshTokenPromise = authStore.refreshTokens()
+              .then(() => {
+                this.refreshTokenPromise = null
+                return authStore.accessToken
+              })
+              .catch((refreshError) => {
+                this.refreshTokenPromise = null
+                authStore.logout()
+                window.location.href = '/login'
+                throw refreshError
+              })
+          }
+
           try {
-            await authStore.refreshTokens()
-            const newToken = authStore.accessToken
+            const newToken = await this.refreshTokenPromise
             if (newToken) {
               originalRequest.headers.Authorization = `Bearer ${newToken}`
               return this.instance(originalRequest)
             }
           } catch (refreshError) {
-            authStore.logout()
-            window.location.href = '/login'
             return Promise.reject(refreshError)
           }
         }

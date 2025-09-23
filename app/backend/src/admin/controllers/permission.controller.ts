@@ -13,6 +13,7 @@ import {
   ParseBoolPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
+import { ParseCuidPipe } from '../../common/pipes/parse-cuid.pipe';
 import {
   ApiTags,
   ApiOperation,
@@ -140,7 +141,7 @@ export class PermissionController {
   @ApiParam({ name: 'id', description: 'Permission ID' })
   @AdminOnly()
   @Get(':id')
-  async getPermissionById(@Param('id') permissionId: string): Promise<PermissionResponseDto> {
+  async getPermissionById(@Param('id', ParseCuidPipe) permissionId: string): Promise<PermissionResponseDto> {
     return this.permissionService.getPermissionById(permissionId);
   }
 
@@ -157,7 +158,7 @@ export class PermissionController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'name', description: 'Permission name' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Get('name/:name')
   async getPermissionByName(@Param('name') name: string): Promise<PermissionResponseDto> {
     return this.permissionService.getPermissionByName(name);
@@ -181,7 +182,7 @@ export class PermissionController {
   @AdminOnly()
   @Put(':id')
   async updatePermission(
-    @Param('id') permissionId: string,
+    @Param('id', ParseCuidPipe) permissionId: string,
     @Body() updatePermissionDto: UpdatePermissionDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<PermissionResponseDto> {
@@ -205,7 +206,7 @@ export class PermissionController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deletePermission(
-    @Param('id') permissionId: string,
+    @Param('id', ParseCuidPipe) permissionId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
     return this.permissionService.deletePermission(permissionId, user.id);
@@ -321,7 +322,7 @@ export class PermissionController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'roleId', description: 'Role ID' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Get('role/:roleId')
   async getRolePermissions(@Param('roleId') roleId: string): Promise<RoleWithPermissionsResponseDto> {
     return this.permissionService.getRolePermissions(roleId);
@@ -340,7 +341,7 @@ export class PermissionController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'userId', description: 'User ID' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Get('user/:userId')
   async getUserPermissions(@Param('userId') userId: string): Promise<UserPermissionsResponseDto> {
     return this.permissionService.getUserPermissions(userId);
@@ -376,7 +377,7 @@ export class PermissionController {
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiBody({ type: CheckPermissionDto })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Post('check/:userId')
   async checkUserPermission(
     @Param('userId') userId: string,
@@ -417,7 +418,7 @@ export class PermissionController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'resource', description: 'Resource type (e.g., USER, ROLE, PORTFOLIO)' })
-  @RequireAnyRole('ADMIN', 'INVESTOR')
+  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
   @Get('resource/:resource')
   async getPermissionsForResource(@Param('resource') resource: string): Promise<PermissionResponseDto[]> {
     return this.permissionService.getPermissionsForResource(resource);
