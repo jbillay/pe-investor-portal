@@ -332,7 +332,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, inject } from 'vue'
 import type { Document } from '@/types/investment'
 
 const searchQuery = ref('')

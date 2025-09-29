@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { createPinia, setActivePinia } from 'pinia'
 import { createApp } from 'vue'
-import { mount, VueWrapper } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { vi } from 'vitest'
 import PrimeVue from 'primevue/config'
 

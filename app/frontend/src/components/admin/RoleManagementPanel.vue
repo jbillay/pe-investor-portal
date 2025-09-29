@@ -372,8 +372,7 @@ const confirm = useConfirm();
 // State
 const selectedRoles = ref([]);
 const showBulkActionsMenu = ref(false);
-const showImportDialog = ref(false);
-const loading = ref(false);
+// Removed duplicate loading ref
 
 // Filters
 const filters = ref({
@@ -595,7 +594,7 @@ const deleteRole = async (role: any) => {
       detail: `Role "${role.name}" has been successfully deleted.`,
       life: 4000
     });
-  } catch (error) {
+  } catch (_) {
     toast.add({
       severity: 'error',
       summary: 'Delete Failed',
@@ -605,15 +604,6 @@ const deleteRole = async (role: any) => {
   }
 };
 
-const exportRoles = () => {
-  // Implement export functionality
-  toast.add({
-    severity: 'info',
-    summary: 'Export Started',
-    detail: 'Role export will be downloaded shortly.',
-    life: 3000
-  });
-};
 
 const bulkActivateRoles = async () => {
   try {
@@ -630,7 +620,7 @@ const bulkActivateRoles = async () => {
 
     selectedRoles.value = [];
     showBulkActionsMenu.value = false;
-  } catch (error) {
+  } catch (_) {
     toast.add({
       severity: 'error',
       summary: 'Activation Failed',
@@ -655,7 +645,7 @@ const bulkDeactivateRoles = async () => {
 
     selectedRoles.value = [];
     showBulkActionsMenu.value = false;
-  } catch (error) {
+  } catch (_) {
     toast.add({
       severity: 'error',
       summary: 'Deactivation Failed',

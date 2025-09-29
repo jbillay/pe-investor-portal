@@ -22,7 +22,29 @@
     </template>
 
     <div class="audit-trail-content h-full flex flex-col">
-      <!-- Filters and Search -->
+      <!-- Quick Stats (Color Blocks) - Moved to Top -->
+      <div class="stats-section mb-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="stat-card p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div class="text-lg font-bold text-blue-600">{{ totalEvents.toLocaleString() }}</div>
+            <div class="text-sm text-gray-600">Total Events</div>
+          </div>
+          <div class="stat-card p-3 bg-green-50 rounded-lg border border-green-200">
+            <div class="text-lg font-bold text-green-600">{{ successfulEvents.toLocaleString() }}</div>
+            <div class="text-sm text-gray-600">Successful</div>
+          </div>
+          <div class="stat-card p-3 bg-red-50 rounded-lg border border-red-200">
+            <div class="text-lg font-bold text-red-600">{{ failedEvents.toLocaleString() }}</div>
+            <div class="text-sm text-gray-600">Failed</div>
+          </div>
+          <div class="stat-card p-3 bg-orange-50 rounded-lg border border-orange-200">
+            <div class="text-lg font-bold text-orange-600">{{ securityEvents.toLocaleString() }}</div>
+            <div class="text-sm text-gray-600">Security Alerts</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters and Search - Under Color Blocks -->
       <div class="filters-section mb-4 p-4 bg-gray-50 rounded-lg border">
         <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div class="col-span-2">
@@ -35,43 +57,46 @@
                 v-model="filters.search"
                 placeholder="Search by user, action, or description..."
                 class="flex-1"
+                aria-label="Search audit events by user, action, or description"
               />
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Action</label>
             <Dropdown
-              v-model="filters.eventType"
-              :options="eventTypeOptions"
+              v-model="filters.action"
+              :options="filterOptions.actions"
               optionLabel="label"
               optionValue="value"
-              placeholder="All Events"
+              placeholder="All Actions"
               class="w-full"
               showClear
+              aria-label="Filter events by action type"
             />
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Resource</label>
             <Dropdown
-              v-model="filters.severity"
-              :options="severityOptions"
+              v-model="filters.resource"
+              :options="filterOptions.resources"
               optionLabel="label"
               optionValue="value"
-              placeholder="All Severities"
+              placeholder="All Resources"
               class="w-full"
               showClear
+              aria-label="Filter events by resource type"
             />
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
             <Dropdown
-              v-model="filters.dateRange"
+              :model-value="dateRangeOptions.find(opt => opt.value === filters.days)"
               :options="dateRangeOptions"
               optionLabel="label"
-              optionValue="value"
+              @update:model-value="onDateRangeChange"
               class="w-full"
             />
           </div>
@@ -81,7 +106,8 @@
               label="Export"
               icon="pi pi-download"
               class="p-button-outlined w-full"
-              @click="exportAuditLogs"
+              :loading="exportLoading"
+              @click="() => exportAuditLogsComposable()"
             />
           </div>
         </div>
@@ -117,7 +143,7 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">Resource</label>
               <Dropdown
                 v-model="filters.resource"
-                :options="resourceOptions"
+                :options="filterOptions.resources"
                 optionLabel="label"
                 optionValue="value"
                 placeholder="Any Resource"
@@ -147,48 +173,35 @@
         </div>
       </div>
 
-      <!-- Quick Stats -->
-      <div class="stats-section mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="stat-card p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div class="text-lg font-bold text-blue-600">{{ totalEvents }}</div>
-          <div class="text-sm text-gray-600">Total Events</div>
-        </div>
-        <div class="stat-card p-3 bg-green-50 rounded-lg border border-green-200">
-          <div class="text-lg font-bold text-green-600">{{ successfulEvents }}</div>
-          <div class="text-sm text-gray-600">Successful</div>
-        </div>
-        <div class="stat-card p-3 bg-red-50 rounded-lg border border-red-200">
-          <div class="text-lg font-bold text-red-600">{{ failedEvents }}</div>
-          <div class="text-sm text-gray-600">Failed</div>
-        </div>
-        <div class="stat-card p-3 bg-orange-50 rounded-lg border border-orange-200">
-          <div class="text-lg font-bold text-orange-600">{{ securityEvents }}</div>
-          <div class="text-sm text-gray-600">Security Alerts</div>
-        </div>
-      </div>
 
       <!-- Audit Log Table -->
       <div class="audit-table-section flex-1 min-h-0">
         <DataTable
           v-model:selection="selectedEvents"
-          :value="filteredAuditLogs"
+          :value="transformedAuditLogs"
           selectionMode="multiple"
           :paginator="true"
-          :rows="20"
+          :rows="filters.limit"
+          :totalRecords="statsData?.summary?.totalEvents || auditData?.pagination?.total || auditData?.length || 0"
+          :first="(filters.page - 1) * filters.limit"
           :loading="loading"
           responsiveLayout="scroll"
           :metaKeySelection="false"
           dataKey="id"
-          :sortField="'timestamp'"
-          :sortOrder="-1"
+          :sortField="filters.sortBy"
+          :sortOrder="filters.sortOrder === 'desc' ? -1 : 1"
           class="audit-datatable h-full"
           :scrollable="true"
           scrollHeight="flex"
+          :lazy="true"
+          @page="onPageChange"
+          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+          currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
         >
           <template #header>
             <div class="flex justify-between items-center">
               <span class="text-lg font-medium text-gray-900">
-                {{ filteredAuditLogs.length }} events found
+                {{ statsData?.summary?.totalEvents || auditData?.pagination?.total || auditData?.length || 0 }} events found (page {{ filters.page }})
               </span>
               <div class="flex gap-2">
                 <Button
@@ -202,7 +215,7 @@
                   label="Refresh"
                   icon="pi pi-refresh"
                   class="p-button-sm p-button-outlined"
-                  @click="refreshAuditLogs"
+                  @click="refreshData"
                   :loading="loading"
                 />
               </div>
@@ -212,16 +225,16 @@
           <Column selectionMode="multiple" headerStyle="width: 3rem" />
 
           <!-- Event Type and Severity -->
-          <Column field="eventType" header="Event" :sortable="true" class="min-w-40">
+          <Column field="action" header="Action" :sortable="true" class="w-32 sm:w-40 lg:min-w-40">
             <template #body="{ data }">
               <div class="flex items-center gap-2">
                 <i
-                  :class="getEventIcon(data.eventType)"
+                  :class="getEventIcon(data.action)"
                   class="text-lg"
-                  :style="{ color: getEventColor(data.eventType) }"
+                  :style="{ color: getEventColor(data.action) }"
                 ></i>
                 <div>
-                  <div class="font-medium text-gray-900">{{ data.eventType }}</div>
+                  <div class="font-medium text-gray-900">{{ data.action }}</div>
                   <Tag
                     :value="data.severity"
                     :severity="getSeverity(data.severity)"
@@ -233,43 +246,41 @@
           </Column>
 
           <!-- User Information -->
-          <Column field="user" header="User" :sortable="true" class="min-w-48">
+          <Column field="userId" header="User" :sortable="true" class="w-36 sm:w-48 lg:min-w-48">
             <template #body="{ data }">
               <div class="flex items-center gap-3">
-                <Avatar
-                  :image="data.user.avatar"
-                  :label="data.user.name ? data.user.name.charAt(0).toUpperCase() : 'U'"
-                  size="normal"
-                  shape="circle"
-                />
                 <div>
-                  <div class="font-medium text-gray-900">{{ data.user.name || 'Unknown User' }}</div>
-                  <div class="text-sm text-gray-600">{{ data.user.email }}</div>
-                  <div class="text-xs text-gray-500">{{ data.user.role }}</div>
+                  <div class="font-medium text-gray-900">{{ data.userDisplayName || 'System' }}</div>
+                  <div v-if="data.user" class="text-sm text-gray-600">{{ data.user.email }}</div>
+                  <div v-if="data.userId" class="text-xs text-gray-500">ID: {{ data.userId }}</div>
                 </div>
               </div>
             </template>
           </Column>
 
           <!-- Action Description -->
-          <Column field="description" header="Description" :sortable="true" class="min-w-80">
+          <Column field="description" header="Description" :sortable="false" class="w-48 sm:w-64 lg:min-w-80">
             <template #body="{ data }">
               <div>
-                <div class="font-medium text-gray-900">{{ data.action }}</div>
-                <div class="text-sm text-gray-600 mt-1">{{ data.description }}</div>
-                <div v-if="data.details" class="text-xs text-gray-500 mt-1">
+                <div class="font-medium text-gray-900">{{ data.description }}</div>
+                <div v-if="data.details && typeof data.details === 'object'" class="text-xs text-gray-500 mt-1">
+                  <details class="cursor-pointer">
+                    <summary class="text-blue-600 hover:text-blue-800">View details</summary>
+                    <pre class="mt-1 text-xs bg-gray-100 p-2 rounded overflow-auto max-h-32">{{ JSON.stringify(data.details, null, 2) }}</pre>
+                  </details>
+                </div>
+                <div v-else-if="data.details" class="text-xs text-gray-500 mt-1">
                   {{ data.details }}
                 </div>
               </div>
             </template>
           </Column>
 
-          <!-- Resource and Target -->
-          <Column field="resource" header="Resource" :sortable="true" class="min-w-32">
+          <!-- Resource -->
+          <Column field="resource" header="Resource" :sortable="true" class="w-24 sm:w-32 lg:min-w-32">
             <template #body="{ data }">
               <div v-if="data.resource">
                 <div class="font-medium text-gray-900">{{ data.resource }}</div>
-                <div v-if="data.targetId" class="text-sm text-gray-600">ID: {{ data.targetId }}</div>
               </div>
               <span v-else class="text-gray-400">-</span>
             </template>
@@ -286,30 +297,31 @@
             </template>
           </Column>
 
-          <!-- IP Address and Location -->
-          <Column field="metadata" header="Location" class="min-w-40">
+          <!-- IP Address and User Agent -->
+          <Column field="ipAddress" header="Location" class="w-32 sm:w-40 lg:min-w-40">
             <template #body="{ data }">
               <div class="text-sm">
-                <div class="text-gray-900">{{ data.metadata?.ipAddress || 'Unknown' }}</div>
-                <div class="text-gray-600">{{ data.metadata?.location || 'Unknown Location' }}</div>
-                <div class="text-gray-500">{{ data.metadata?.userAgent || '' }}</div>
+                <div class="text-gray-900">{{ data.ipAddress || 'Unknown' }}</div>
+                <div v-if="data.userAgent" class="text-gray-500 truncate max-w-32" :title="data.userAgent">
+                  {{ data.userAgent.split('/')[0] || 'Unknown' }}
+                </div>
               </div>
             </template>
           </Column>
 
           <!-- Timestamp -->
-          <Column field="timestamp" header="Time" :sortable="true" class="min-w-44">
+          <Column field="createdAt" header="Time" :sortable="true" class="w-36 sm:w-44 lg:min-w-44">
             <template #body="{ data }">
               <div class="text-sm">
-                <div class="text-gray-900">{{ formatDate(data.timestamp) }}</div>
-                <div class="text-gray-600">{{ formatTime(data.timestamp) }}</div>
-                <div class="text-gray-500">{{ getRelativeTime(data.timestamp) }}</div>
+                <div class="text-gray-900">{{ formatDate(data.createdAt) }}</div>
+                <div class="text-gray-600">{{ formatTime(data.createdAt) }}</div>
+                <div class="text-gray-500">{{ getRelativeTime(data.createdAt) }}</div>
               </div>
             </template>
           </Column>
 
           <!-- Actions -->
-          <Column header="Actions" class="min-w-32">
+          <Column header="Actions" class="w-24 sm:w-32 lg:min-w-32">
             <template #body="{ data }">
               <div class="flex items-center gap-1">
                 <Button
@@ -317,12 +329,14 @@
                   class="p-button-sm p-button-text p-button-rounded"
                   @click="viewEventDetails(data)"
                   v-tooltip.top="'View Details'"
+                  :aria-label="`View details for ${data.action} event by ${data.userDisplayName}`"
                 />
                 <Button
                   icon="pi pi-share-alt"
                   class="p-button-sm p-button-text p-button-rounded"
                   @click="shareEvent(data)"
                   v-tooltip.top="'Share Event'"
+                  :aria-label="`Share ${data.action} event details`"
                 />
                 <Button
                   v-if="data.severity === 'HIGH' || data.status === 'FAILED'"
@@ -330,6 +344,7 @@
                   class="p-button-sm p-button-text p-button-rounded p-button-danger"
                   @click="flagEvent(data)"
                   v-tooltip.top="'Flag for Review'"
+                  :aria-label="`Flag ${data.action} event for security review`"
                 />
               </div>
             </template>
@@ -344,32 +359,109 @@
           </template>
 
           <template #loading>
-            <div class="text-center py-8">
-              <ProgressSpinner class="w-12 h-12" />
-              <p class="text-gray-600 mt-4">Loading audit trail...</p>
+            <div class="space-y-4 p-6" role="status" aria-label="Loading audit events">
+              <div v-for="i in 5" :key="i" class="animate-pulse">
+                <div class="flex items-center space-x-4">
+                  <div class="h-4 bg-gray-200 rounded w-8"></div>
+                  <div class="h-4 bg-gray-200 rounded w-20"></div>
+                  <div class="h-4 bg-gray-200 rounded w-32"></div>
+                  <div class="h-4 bg-gray-200 rounded flex-1"></div>
+                  <div class="h-4 bg-gray-200 rounded w-16"></div>
+                  <div class="h-4 bg-gray-200 rounded w-20"></div>
+                  <div class="h-4 bg-gray-200 rounded w-24"></div>
+                  <div class="h-4 bg-gray-200 rounded w-16"></div>
+                </div>
+                <div class="mt-2 flex items-center space-x-4">
+                  <div class="h-3 bg-gray-100 rounded w-6"></div>
+                  <div class="h-3 bg-gray-100 rounded w-16"></div>
+                  <div class="h-3 bg-gray-100 rounded w-24"></div>
+                  <div class="h-3 bg-gray-100 rounded w-48"></div>
+                  <div class="h-3 bg-gray-100 rounded w-12"></div>
+                  <div class="h-3 bg-gray-100 rounded w-16"></div>
+                  <div class="h-3 bg-gray-100 rounded w-20"></div>
+                  <div class="h-3 bg-gray-100 rounded w-12"></div>
+                </div>
+              </div>
+              <div class="text-center pt-4">
+                <div class="inline-flex items-center">
+                  <ProgressSpinner class="w-5 h-5 mr-2" />
+                  <span class="text-gray-600 text-sm">Loading audit events...</span>
+                </div>
+              </div>
             </div>
           </template>
         </DataTable>
       </div>
     </div>
 
-    <template #footer>
-      <div class="flex items-center justify-between">
-        <div class="text-sm text-gray-500">
-          <i class="pi pi-info-circle mr-1"></i>
-          Audit logs are retained for 365 days
+    <!-- Top Actions & Resources Summary - Moved to Bottom -->
+    <div class="summary-section mt-6 mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Top Actions -->
+        <div class="action-summary">
+          <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+            <i class="pi pi-chart-bar mr-2 text-blue-600"></i>
+            Top Actions
+          </h3>
+          <div class="space-y-2">
+            <div v-if="statsData?.topActions?.length" class="space-y-2">
+              <div
+                v-for="action in statsData.topActions.slice(0, 5)"
+                :key="action.action"
+                class="flex items-center justify-between p-2 bg-gray-50 rounded border"
+              >
+                <span class="text-sm font-medium text-gray-700">{{ action.action }}</span>
+                <span class="text-sm text-blue-600 font-semibold">{{ action.count }}</span>
+              </div>
+            </div>
+            <div v-else class="text-sm text-gray-500 italic">
+              No action data available
+            </div>
+          </div>
         </div>
-        <div class="flex gap-3">
+
+        <!-- Top Resources -->
+        <div class="resource-summary">
+          <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+            <i class="pi pi-database mr-2 text-green-600"></i>
+            Top Resources
+          </h3>
+          <div class="space-y-2">
+            <div v-if="statsData?.topResources?.length" class="space-y-2">
+              <div
+                v-for="resource in statsData.topResources.slice(0, 5)"
+                :key="resource.resource"
+                class="flex items-center justify-between p-2 bg-gray-50 rounded border"
+              >
+                <span class="text-sm font-medium text-gray-700">{{ resource.resource }}</span>
+                <span class="text-sm text-green-600 font-semibold">{{ resource.count }}</span>
+              </div>
+            </div>
+            <div v-else class="text-sm text-gray-500 italic">
+              No resource data available
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="flex items-center justify-between px-6 py-4 bg-gray-50 border-t">
+        <div class="text-sm text-gray-500 flex items-center">
+          <i class="pi pi-info-circle mr-2 text-blue-500"></i>
+          Audit logs are retained for {{ AUDIT_CONFIG.RETENTION_DAYS }} days
+        </div>
+        <div class="flex items-center gap-3">
           <Button
             label="Generate Report"
             icon="pi pi-file-pdf"
-            class="p-button-outlined"
-            @click="generateReport"
+            class="p-button-outlined p-button-secondary px-6 py-2"
+            @click="() => exportAuditLogsComposable('xlsx')"
           />
           <Button
             label="Close"
             icon="pi pi-times"
-            class="p-button-outlined"
+            class="p-button-primary px-8 py-2 font-semibold text-white bg-blue-600 hover:bg-blue-700 border-blue-600 hover:border-blue-700"
             @click="closeDialog"
           />
         </div>
@@ -404,8 +496,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
+import { useAuditTrail } from '@/composables/useAuditTrail';
+import { auditTrailService } from '@/services/auditTrailService';
+
+// Simple debounce function
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+import Dialog from 'primevue/dialog';
 
 // Props
 const props = defineProps<{
@@ -419,240 +524,41 @@ const emit = defineEmits<{
 
 // Composables
 const toast = useToast();
+const {
+  loading,
+  exportLoading,
+  auditData,
+  statsData,
+  transformedAuditLogs,
+  userOptions,
+  filters,
+  totalEvents,
+  successfulEvents,
+  failedEvents,
+  securityEvents,
+  loadAuditLogs,
+  loadAuditStatistics,
+  resetFilters,
+  refreshData,
+  exportAuditLogs: exportAuditLogsComposable,
+  onPageChange,
+  onFiltersChange,
+  AUDIT_CONFIG
+} = useAuditTrail();
 
-// State
+// Component state
 const dialogVisible = ref(props.visible);
 const selectedEvents = ref([]);
 const showAdvancedFilters = ref(false);
 const showBulkActionsMenu = ref(false);
-const loading = ref(false);
 
-// Filters
-const filters = ref({
-  search: '',
-  eventType: null,
-  severity: null,
-  dateRange: '7d',
-  userId: null,
-  resource: null,
-  ipAddress: '',
-});
+// Get filter options from service
+const filterOptions = auditTrailService.getFilterOptions();
 
-// Mock audit log data
-const auditLogs = ref([
-  {
-    id: '1',
-    eventType: 'ROLE_ASSIGNED',
-    action: 'Role Assignment',
-    description: 'FUND_MANAGER role assigned to user',
-    severity: 'MEDIUM',
-    status: 'SUCCESS',
-    resource: 'USER',
-    targetId: 'user-123',
-    user: {
-      id: 'admin-1',
-      name: 'Admin User',
-      email: 'admin@company.com',
-      role: 'SUPER_ADMIN',
-      avatar: null
-    },
-    metadata: {
-      ipAddress: '192.168.1.100',
-      location: 'New York, US',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    },
-    details: 'User promoted from INVESTOR to FUND_MANAGER role',
-    timestamp: new Date('2024-01-20T14:30:00Z')
-  },
-  {
-    id: '2',
-    eventType: 'PERMISSION_DENIED',
-    action: 'Permission Denied',
-    description: 'Attempted access to restricted resource',
-    severity: 'HIGH',
-    status: 'FAILED',
-    resource: 'SYSTEM',
-    targetId: 'config-settings',
-    user: {
-      id: 'user-456',
-      name: 'John Smith',
-      email: 'john@company.com',
-      role: 'ANALYST',
-      avatar: null
-    },
-    metadata: {
-      ipAddress: '10.0.0.50',
-      location: 'London, UK',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
-    },
-    details: 'User attempted to access system configuration without proper permissions',
-    timestamp: new Date('2024-01-20T14:25:00Z')
-  },
-  {
-    id: '3',
-    eventType: 'LOGIN_SUCCESS',
-    action: 'Successful Login',
-    description: 'User logged in successfully',
-    severity: 'LOW',
-    status: 'SUCCESS',
-    resource: null,
-    targetId: null,
-    user: {
-      id: 'user-789',
-      name: 'Sarah Johnson',
-      email: 'sarah@company.com',
-      role: 'INVESTOR',
-      avatar: null
-    },
-    metadata: {
-      ipAddress: '203.0.113.45',
-      location: 'Sydney, AU',
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)'
-    },
-    details: 'Multi-factor authentication completed successfully',
-    timestamp: new Date('2024-01-20T14:20:00Z')
-  },
-  {
-    id: '4',
-    eventType: 'PERMISSION_CHANGED',
-    action: 'Permission Modified',
-    description: 'Role permissions updated',
-    severity: 'MEDIUM',
-    status: 'SUCCESS',
-    resource: 'ROLE',
-    targetId: 'role-compliance',
-    user: {
-      id: 'admin-2',
-      name: 'System Admin',
-      email: 'sysadmin@company.com',
-      role: 'SUPER_ADMIN',
-      avatar: null
-    },
-    metadata: {
-      ipAddress: '192.168.1.101',
-      location: 'San Francisco, US',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    },
-    details: 'Added DOCUMENT:READ_CONFIDENTIAL permission to COMPLIANCE_OFFICER role',
-    timestamp: new Date('2024-01-20T14:15:00Z')
-  },
-  {
-    id: '5',
-    eventType: 'SECURITY_VIOLATION',
-    action: 'Security Violation',
-    description: 'Multiple failed login attempts detected',
-    severity: 'HIGH',
-    status: 'FAILED',
-    resource: 'AUTH',
-    targetId: 'login-endpoint',
-    user: {
-      id: 'unknown',
-      name: 'Unknown User',
-      email: 'suspicious@external.com',
-      role: 'UNKNOWN',
-      avatar: null
-    },
-    metadata: {
-      ipAddress: '185.220.101.42',
-      location: 'Unknown Location',
-      userAgent: 'curl/7.68.0'
-    },
-    details: '15 failed login attempts within 5 minutes - potential brute force attack',
-    timestamp: new Date('2024-01-20T14:10:00Z')
-  }
-]);
+// Use date range options from composable
+const dateRangeOptions = AUDIT_CONFIG.DATE_RANGES;
 
-// Filter options
-const eventTypeOptions = [
-  { label: 'Role Assignment', value: 'ROLE_ASSIGNED' },
-  { label: 'Role Removal', value: 'ROLE_REMOVED' },
-  { label: 'Permission Changed', value: 'PERMISSION_CHANGED' },
-  { label: 'Permission Denied', value: 'PERMISSION_DENIED' },
-  { label: 'Login Success', value: 'LOGIN_SUCCESS' },
-  { label: 'Login Failed', value: 'LOGIN_FAILED' },
-  { label: 'Security Violation', value: 'SECURITY_VIOLATION' },
-  { label: 'User Created', value: 'USER_CREATED' },
-  { label: 'User Updated', value: 'USER_UPDATED' },
-  { label: 'User Deleted', value: 'USER_DELETED' },
-];
-
-const severityOptions = [
-  { label: 'Low', value: 'LOW' },
-  { label: 'Medium', value: 'MEDIUM' },
-  { label: 'High', value: 'HIGH' },
-  { label: 'Critical', value: 'CRITICAL' },
-];
-
-const dateRangeOptions = [
-  { label: 'Last hour', value: '1h' },
-  { label: 'Last 24 hours', value: '24h' },
-  { label: 'Last 7 days', value: '7d' },
-  { label: 'Last 30 days', value: '30d' },
-  { label: 'Last 90 days', value: '90d' },
-];
-
-const userOptions = ref([
-  { label: 'Admin User', value: 'admin-1' },
-  { label: 'System Admin', value: 'admin-2' },
-  { label: 'John Smith', value: 'user-456' },
-  { label: 'Sarah Johnson', value: 'user-789' },
-]);
-
-const resourceOptions = [
-  { label: 'User', value: 'USER' },
-  { label: 'Role', value: 'ROLE' },
-  { label: 'Permission', value: 'PERMISSION' },
-  { label: 'System', value: 'SYSTEM' },
-  { label: 'Auth', value: 'AUTH' },
-  { label: 'Fund', value: 'FUND' },
-  { label: 'Investment', value: 'INVESTMENT' },
-  { label: 'Document', value: 'DOCUMENT' },
-];
-
-// Computed properties
-const filteredAuditLogs = computed(() => {
-  let filtered = auditLogs.value;
-
-  if (filters.value.search) {
-    const search = filters.value.search.toLowerCase();
-    filtered = filtered.filter(log =>
-      log.action.toLowerCase().includes(search) ||
-      log.description.toLowerCase().includes(search) ||
-      log.user.name?.toLowerCase().includes(search) ||
-      log.user.email?.toLowerCase().includes(search) ||
-      log.details?.toLowerCase().includes(search)
-    );
-  }
-
-  if (filters.value.eventType) {
-    filtered = filtered.filter(log => log.eventType === filters.value.eventType);
-  }
-
-  if (filters.value.severity) {
-    filtered = filtered.filter(log => log.severity === filters.value.severity);
-  }
-
-  if (filters.value.userId) {
-    filtered = filtered.filter(log => log.user.id === filters.value.userId);
-  }
-
-  if (filters.value.resource) {
-    filtered = filtered.filter(log => log.resource === filters.value.resource);
-  }
-
-  if (filters.value.ipAddress) {
-    filtered = filtered.filter(log =>
-      log.metadata?.ipAddress?.includes(filters.value.ipAddress)
-    );
-  }
-
-  return filtered;
-});
-
-const totalEvents = computed(() => filteredAuditLogs.value.length);
-const successfulEvents = computed(() => filteredAuditLogs.value.filter(log => log.status === 'SUCCESS').length);
-const failedEvents = computed(() => filteredAuditLogs.value.filter(log => log.status === 'FAILED').length);
-const securityEvents = computed(() => filteredAuditLogs.value.filter(log => log.severity === 'HIGH' || log.severity === 'CRITICAL').length);
+// Computed properties for display
 
 // Watchers
 watch(() => props.visible, (newValue) => {
@@ -664,36 +570,50 @@ watch(dialogVisible, (newValue) => {
 });
 
 // Methods
-const getEventIcon = (eventType: string) => {
-  const icons = {
+const getEventIcon = (action: string) => {
+  const icons: Record<string, string> = {
     'ROLE_ASSIGNED': 'pi pi-user-plus',
-    'ROLE_REMOVED': 'pi pi-user-minus',
-    'PERMISSION_CHANGED': 'pi pi-cog',
-    'PERMISSION_DENIED': 'pi pi-ban',
-    'LOGIN_SUCCESS': 'pi pi-sign-in',
+    'ROLE_REVOKED': 'pi pi-user-minus',
+    'PERMISSION_GRANTED': 'pi pi-cog',
+    'PERMISSION_REVOKED': 'pi pi-ban',
+    'LOGIN': 'pi pi-sign-in',
+    'LOGOUT': 'pi pi-sign-out',
     'LOGIN_FAILED': 'pi pi-times-circle',
-    'SECURITY_VIOLATION': 'pi pi-exclamation-triangle',
+    'SUSPICIOUS_ACTIVITY': 'pi pi-exclamation-triangle',
     'USER_CREATED': 'pi pi-plus',
     'USER_UPDATED': 'pi pi-pencil',
     'USER_DELETED': 'pi pi-trash',
+    'USER_VIEWED': 'pi pi-eye',
+    'TOKEN_REFRESH': 'pi pi-refresh',
+    'PASSWORD_RESET': 'pi pi-key',
+    'PASSWORD_CHANGED': 'pi pi-lock',
+    'ACCOUNT_LOCKED': 'pi pi-lock',
+    'RATE_LIMIT_EXCEEDED': 'pi pi-clock',
   };
-  return icons[eventType] || 'pi pi-info-circle';
+  return icons[action] || 'pi pi-info-circle';
 };
 
-const getEventColor = (eventType: string) => {
-  const colors = {
+const getEventColor = (action: string) => {
+  const colors: Record<string, string> = {
     'ROLE_ASSIGNED': '#10b981',
-    'ROLE_REMOVED': '#f59e0b',
-    'PERMISSION_CHANGED': '#3b82f6',
-    'PERMISSION_DENIED': '#ef4444',
-    'LOGIN_SUCCESS': '#10b981',
+    'ROLE_REVOKED': '#f59e0b',
+    'PERMISSION_GRANTED': '#3b82f6',
+    'PERMISSION_REVOKED': '#ef4444',
+    'LOGIN': '#10b981',
+    'LOGOUT': '#6b7280',
     'LOGIN_FAILED': '#ef4444',
-    'SECURITY_VIOLATION': '#dc2626',
+    'SUSPICIOUS_ACTIVITY': '#dc2626',
     'USER_CREATED': '#8b5cf6',
     'USER_UPDATED': '#06b6d4',
     'USER_DELETED': '#ef4444',
+    'USER_VIEWED': '#3b82f6',
+    'TOKEN_REFRESH': '#10b981',
+    'PASSWORD_RESET': '#f59e0b',
+    'PASSWORD_CHANGED': '#10b981',
+    'ACCOUNT_LOCKED': '#dc2626',
+    'RATE_LIMIT_EXCEEDED': '#f59e0b',
   };
-  return colors[eventType] || '#6b7280';
+  return colors[action] || '#6b7280';
 };
 
 const getSeverity = (severity: string) => {
@@ -715,25 +635,25 @@ const getStatusSeverity = (status: string) => {
   }
 };
 
-const formatDate = (date: Date) => {
+const formatDate = (dateString: string) => {
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
-  }).format(new Date(date));
+  }).format(new Date(dateString));
 };
 
-const formatTime = (date: Date) => {
+const formatTime = (dateString: string) => {
   return new Intl.DateTimeFormat('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit'
-  }).format(new Date(date));
+  }).format(new Date(dateString));
 };
 
-const getRelativeTime = (date: Date) => {
+const getRelativeTime = (dateString: string) => {
   const now = new Date();
-  const diff = Math.floor((now.getTime() - new Date(date).getTime()) / 60000); // diff in minutes
+  const diff = Math.floor((now.getTime() - new Date(dateString).getTime()) / 60000); // diff in minutes
 
   if (diff < 1) return 'Just now';
   if (diff < 60) return `${diff}m ago`;
@@ -741,20 +661,38 @@ const getRelativeTime = (date: Date) => {
   return `${Math.floor(diff / 1440)}d ago`;
 };
 
-const resetFilters = () => {
-  filters.value = {
-    search: '',
-    eventType: null,
-    severity: null,
-    dateRange: '7d',
-    userId: null,
-    resource: null,
-    ipAddress: '',
-  };
+// resetFilters is now provided by the composable
+
+// Debounced filter change function for better performance
+const debouncedFiltersChange = debounce(() => {
+  onFiltersChange();
+}, AUDIT_CONFIG.DEBOUNCE_DELAY);
+
+// Watch for filter changes and reload both data sources with debouncing
+watch(
+  () => [filters.search, filters.action, filters.resource, filters.userId, filters.ipAddress, filters.days],
+  () => {
+    debouncedFiltersChange();
+  },
+  { deep: true }
+);
+
+// Handle date range selection
+const onDateRangeChange = (selectedRange: any) => {
+  if (selectedRange?.value) {
+    filters.days = selectedRange.value;
+    // Immediate load for date range changes as they're less frequent
+    filters.page = 1;
+    loadAuditLogs();
+  }
 };
 
+// onPageChange is now provided by the composable
+
 const onDialogShow = () => {
+  console.log('Dialog shown - loading audit logs and statistics');
   loadAuditLogs();
+  loadAuditStatistics();
 };
 
 const onDialogHide = () => {
@@ -766,83 +704,123 @@ const closeDialog = () => {
   dialogVisible.value = false;
 };
 
-const loadAuditLogs = async () => {
-  loading.value = true;
-  try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  } finally {
-    loading.value = false;
-  }
-};
+// loadAuditLogs is now provided by the composable
 
-const refreshAuditLogs = async () => {
-  loading.value = true;
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast.add({
-      severity: 'success',
-      summary: 'Refreshed',
-      detail: 'Audit logs have been refreshed.',
-      life: 3000
-    });
-  } finally {
-    loading.value = false;
-  }
-};
+// loadAuditStatistics is now provided by the composable
+
+// refreshData is now provided by the composable
 
 const viewEventDetails = (event: any) => {
+  // Create a detailed view of the event
+  const details = {
+    id: event.id,
+    action: event.action,
+    user: event.user,
+    resource: event.resource,
+    ipAddress: event.ipAddress,
+    userAgent: event.userAgent,
+    details: event.details,
+    createdAt: event.createdAt
+  };
+
+  // For now, show in console and toast - could be enhanced with a modal
+  console.log('Event Details:', details);
   toast.add({
     severity: 'info',
     summary: 'Event Details',
-    detail: `Viewing details for: ${event.action}`,
+    detail: `Details logged to console for: ${event.action}`,
     life: 3000
   });
 };
 
-const shareEvent = (event: any) => {
-  toast.add({
-    severity: 'info',
-    summary: 'Event Shared',
-    detail: `Event details copied to clipboard.`,
-    life: 3000
-  });
+const shareEvent = async (event: any) => {
+  try {
+    const eventText = `Audit Event: ${event.action} by ${event.userDisplayName} at ${formatDate(event.createdAt)} ${formatTime(event.createdAt)}`;
+    await navigator.clipboard.writeText(eventText);
+    toast.add({
+      severity: 'success',
+      summary: 'Event Shared',
+      detail: 'Event details copied to clipboard.',
+      life: 3000
+    });
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Share Failed',
+      detail: 'Could not copy to clipboard.',
+      life: 3000
+    });
+  }
 };
 
 const flagEvent = (event: any) => {
+  // In a real implementation, this would call an API to flag the event
   toast.add({
-    severity: 'info',
+    severity: 'warn',
     summary: 'Event Flagged',
-    detail: `Event has been flagged for review.`,
+    detail: `Event ${event.id} has been flagged for review. TO BE DEVELOPED`,
     life: 3000
   });
 };
 
-const exportAuditLogs = () => {
-  toast.add({
-    severity: 'info',
-    summary: 'Export Started',
-    detail: 'Audit logs export will be downloaded shortly.',
-    life: 3000
-  });
-};
+// exportAuditLogs is now provided by the composable
 
-const exportSelectedEvents = () => {
-  toast.add({
-    severity: 'info',
-    summary: 'Export Started',
-    detail: `Exporting ${selectedEvents.value.length} selected events.`,
-    life: 3000
-  });
+const exportSelectedEvents = async () => {
+  if (selectedEvents.value.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'No Selection',
+      detail: 'Please select events to export.',
+      life: 3000
+    });
+    return;
+  }
+
+  try {
+    const exportRequest = {
+      format: 'csv' as const,
+      fields: ['id', 'action', 'userId', 'resource', 'ipAddress', 'createdAt'],
+      ...filters
+    };
+
+    const response = await auditTrailService.exportAuditTrail(exportRequest);
+    await auditTrailService.downloadExport(response.downloadUrl, response.fileName);
+
+    toast.add({
+      severity: 'success',
+      summary: 'Export Complete',
+      detail: `Exported ${selectedEvents.value.length} selected events.`,
+      life: 3000
+    });
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Export Failed',
+      detail: 'Failed to export selected events.',
+      life: 3000
+    });
+  }
+
   selectedEvents.value = [];
   showBulkActionsMenu.value = false;
 };
 
 const flagSelectedEvents = () => {
+  if (selectedEvents.value.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'No Selection',
+      detail: 'Please select events to flag.',
+      life: 3000
+    });
+    return;
+  }
+
+  // In a real implementation, this would call an API to flag the events
   toast.add({
-    severity: 'info',
+    severity: 'warn',
     summary: 'Events Flagged',
-    detail: `${selectedEvents.value.length} events have been flagged for review.`,
+    detail: `${selectedEvents.value.length} events have been flagged for review. TO BE DEVELOPED`,
     life: 3000
   });
   selectedEvents.value = [];
@@ -850,29 +828,36 @@ const flagSelectedEvents = () => {
 };
 
 const markAsReviewed = () => {
+  if (selectedEvents.value.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'No Selection',
+      detail: 'Please select events to mark as reviewed.',
+      life: 3000
+    });
+    return;
+  }
+
+  // In a real implementation, this would call an API to mark events as reviewed
   toast.add({
     severity: 'success',
     summary: 'Events Reviewed',
-    detail: `${selectedEvents.value.length} events marked as reviewed.`,
+    detail: `${selectedEvents.value.length} events marked as reviewed. TO BE DEVELOPED`,
     life: 3000
   });
   selectedEvents.value = [];
   showBulkActionsMenu.value = false;
 };
 
-const generateReport = () => {
-  toast.add({
-    severity: 'info',
-    summary: 'Report Generation',
-    detail: 'Comprehensive audit report will be generated.',
-    life: 3000
-  });
-};
+// generateReport is now handled by exportAuditLogsComposable('xlsx')
 
 // Lifecycle
 onMounted(() => {
+  console.log('AuditTrailDialog mounted, props.visible:', props.visible);
   if (props.visible) {
+    console.log('Component is visible on mount, loading data');
     loadAuditLogs();
+    loadAuditStatistics();
   }
 });
 </script>
@@ -982,6 +967,24 @@ onMounted(() => {
   .audit-datatable :deep(.p-datatable-tbody > tr > td) {
     @apply px-3 py-3;
   }
+}
+
+/* Focus indicators for better accessibility */
+.audit-datatable :deep(.p-button:focus-visible) {
+  @apply ring-2 ring-blue-500 ring-offset-2 outline-none;
+}
+
+.audit-datatable :deep(.p-checkbox:focus-visible .p-checkbox-box) {
+  @apply ring-2 ring-blue-500 ring-offset-2;
+}
+
+.audit-datatable :deep(.p-datatable-tbody > tr:focus-visible) {
+  @apply ring-2 ring-blue-500 ring-offset-2 outline-none;
+}
+
+.filters-section :deep(.p-inputtext:focus-visible),
+.filters-section :deep(.p-dropdown:focus-visible .p-dropdown-label) {
+  @apply ring-2 ring-blue-500 ring-offset-2 outline-none;
 }
 
 /* Animation for severity indicators */
