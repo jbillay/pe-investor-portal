@@ -15,7 +15,7 @@ import {
   UseInterceptors,
   ClassSerializerInterceptor,
   Request,
-  Logger
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -411,7 +411,7 @@ export class UserController {
     description: 'User verification status successfully updated',
     type: UserResponseDto
   })
-  @RequirePermissions('USER_VERIFY')
+  @RequirePermissions('USER_UPDATE')
   @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_VERIFICATION_CHANGED')
   async updateVerification(
@@ -458,7 +458,7 @@ export class UserController {
     status: 400,
     description: 'Cannot reset own password through this endpoint'
   })
-  @RequirePermissions('USER_PASSWORD_RESET')
+  @RequirePermissions('USER:UPDATE')
   @RequireRoles('SUPER_ADMIN')
   @RateLimit({ limit: 5, window: 300 }) // 5 requests per 5 minutes
   @AuditLog('USER_PASSWORD_RESET')
@@ -547,7 +547,7 @@ export class UserController {
     status: 400,
     description: 'Invalid roles or assignment conflict'
   })
-  @RequirePermissions('USER_ROLES_ASSIGN')
+  @RequirePermissions('USER:MANAGE_ROLES')
   @RequireAnyRole('SUPER_ADMIN', 'FUND_MANAGER')
   @AuditLog('USER_ROLES_ASSIGNED')
   async assignRoles(
@@ -594,7 +594,7 @@ export class UserController {
     status: 400,
     description: 'Cannot revoke role - user must have at least one role'
   })
-  @RequirePermissions('USER_ROLES_REVOKE')
+  @RequirePermissions('USER:MANAGE_ROLES')
   @RequireAnyRole('SUPER_ADMIN', 'FUND_MANAGER')
   @AuditLog('USER_ROLES_REVOKED')
   async revokeRoles(
@@ -637,7 +637,7 @@ export class UserController {
     status: 400,
     description: 'Invalid operation data or too many users'
   })
-  @RequirePermissions('USER_BULK_OPERATIONS')
+  @RequirePermissions('USER:UPDATE')
   @RequireRoles('SUPER_ADMIN')
   @RateLimit({ limit: 3, window: 600 }) // 3 requests per 10 minutes
   @AuditLog('USER_BULK_ROLE_OPERATION')
@@ -735,5 +735,75 @@ export class UserController {
   ) {
     this.logger.log(`User ${req.user.id} exporting user data`);
     return this.userService.exportUsers(query, req.user.id);
+  }
+
+
+  /**
+   * Get user audit logs
+   *
+   * @param id - User CUID
+   * @param query - Query parameters for filtering audit logs
+   * @returns User's audit log entries
+   */
+  @Get(':id/audit-logs')
+  @ApiOperation({
+    summary: 'Get user audit logs',
+    description: `
+      Retrieve audit logs for a specific user with filtering options:
+      - Time period filtering (last 7 days, 30 days, 90 days, all time)
+      - Action type filtering
+      - Resource filtering
+      - Pagination support
+      - Sorted by creation date (newest first)
+
+      Security: Requires SUPER_ADMIN role or AUDIT_READ permission
+    `
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'User CUID',
+    example: 'clfa2qhe40000j3gbahzp12s4'
+  })
+  @ApiQuery({
+    name: 'days',
+    description: 'Number of days to look back (default: 30)',
+    required: false,
+    type: Number,
+    example: 30
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Maximum number of logs to return (default: 50, max: 100)',
+    required: false,
+    type: Number,
+    example: 50
+  })
+  @ApiQuery({
+    name: 'action',
+    description: 'Filter by specific action type',
+    required: false,
+    type: String,
+    example: 'LOGIN'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved user audit logs'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found'
+  })
+  @RequirePermissions('USER_READ')
+  @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
+  @AuditLog('USER_AUDIT_ACCESSED')
+  async getUserAuditLogs(
+    @Param('id', ParseCuidPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+    @Query('days') days?: number,
+    @Query('limit') limit?: number,
+    @Query('action') action?: string
+  ) {
+    this.logger.log(`User ${req.user.id} requested audit logs for user ${id}`);
+    return this.userService.getUserAuditLogs(id, { days, limit, action }, req.user.id);
   }
 }

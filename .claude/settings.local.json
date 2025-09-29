@@ -30,7 +30,15 @@
       "Bash(find:*)",
       "Bash(timeout 120 npm test)",
       "Bash(npm run:*)",
-      "mcp__playwright__browser_type"
+      "mcp__playwright__browser_type",
+      "Bash(git commit:*)",
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_evaluate",
+      "Bash(npx eslint:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(npx prisma generate:*)",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_tabs"
     ],
     "deny": [],
     "ask": []

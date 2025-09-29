@@ -13,9 +13,9 @@ import {
   JwtTokens,
   AuthenticatedUser,
 } from '../interfaces/auth.interface';
+import { AuditLoggerService } from '../../common/services/audit-logger.service';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
-import { Console } from 'console';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +24,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private sessionService: SessionService,
+    private auditLogger: AuditLoggerService,
   ) {}
 
   async register(
@@ -85,7 +86,7 @@ export class AuthService {
     });
 
     // Log audit event
-    await this.logAuditEvent(
+    await this.auditLogger.logAuthEvent(
       'REGISTER',
       user.id,
       ipAddress,
@@ -153,7 +154,7 @@ export class AuthService {
     });
 
     // Log audit event
-    await this.logAuditEvent(
+    await this.auditLogger.logAuthEvent(
       'LOGIN',
       user.id,
       ipAddress,
@@ -219,7 +220,7 @@ export class AuthService {
     });
 
     // Log audit event
-    await this.logAuditEvent(
+    await this.auditLogger.logAuthEvent(
       'TOKEN_REFRESH',
       user.id,
       ipAddress,
@@ -250,7 +251,7 @@ export class AuthService {
 
     if (sessionData) {
       // Log audit event
-      await this.logAuditEvent(
+      await this.auditLogger.logAuthEvent(
         'LOGOUT',
         sessionData.userId,
         ipAddress,
@@ -272,7 +273,7 @@ export class AuthService {
 
     if (user) {
       // Log audit event
-      await this.logAuditEvent(
+      await this.auditLogger.logAuthEvent(
         'LOGOUT_ALL',
         userId,
         ipAddress,
@@ -340,26 +341,4 @@ export class AuthService {
     return 900; // Default 15 minutes
   }
 
-  private async logAuditEvent(
-    action: string,
-    userId: string,
-    ipAddress?: string,
-    userAgent?: string,
-    details?: any,
-  ): Promise<void> {
-    try {
-      await this.prisma.auditLog.create({
-        data: {
-          userId,
-          action,
-          ipAddress,
-          userAgent,
-          ...(details && { details }),
-        },
-      });
-    } catch (error) {
-      // Log audit errors but don't fail the main operation
-      console.error('Failed to log audit event:', error);
-    }
-  }
 }

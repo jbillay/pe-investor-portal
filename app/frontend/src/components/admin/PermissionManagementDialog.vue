@@ -284,6 +284,10 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 
+import Textarea from 'primevue/textarea';
+import Checkbox from 'primevue/checkbox';
+import Dialog from 'primevue/dialog';
+
 // Props
 const props = defineProps<{
   visible: boolean;

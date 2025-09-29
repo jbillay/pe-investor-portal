@@ -38,12 +38,6 @@
               :key="user.id"
               class="user-item flex items-center gap-3 p-3 bg-white rounded-lg border"
             >
-              <Avatar
-                :image="user.profileImage"
-                :label="user.name ? user.name.charAt(0).toUpperCase() : 'U'"
-                size="normal"
-                shape="circle"
-              />
               <div class="flex-1 min-w-0">
                 <div class="font-medium text-gray-900 truncate">{{ user.name || 'Unknown User' }}</div>
                 <div class="text-sm text-gray-600 truncate">{{ user.email }}</div>
@@ -341,6 +335,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
+
+import Textarea from 'primevue/textarea';
+import Checkbox from 'primevue/checkbox';
+import Dialog from 'primevue/dialog';
 
 // Props
 const props = defineProps<{

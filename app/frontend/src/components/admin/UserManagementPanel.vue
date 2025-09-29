@@ -62,7 +62,7 @@
       <!-- Selection Column -->
       <Column selectionMode="multiple" headerStyle="width: 3rem" />
 
-      <!-- Avatar and User Info Column -->
+      <!-- User Info Column -->
       <Column field="user" :sortable="false" style="min-width: 250px">
         <template #header>
           <div class="flex items-center gap-2 text-gray-700 font-semibold">
@@ -263,32 +263,61 @@
             selectedPermissionUser?.email
           }}
         </p>
+
+        <!-- Permission Filter -->
+        <div class="mb-4" v-if="selectedPermissionUser?.permissions?.length">
+          <div class="p-input-icon-left">
+            <i class="pi pi-search" />
+            <InputText
+              v-model="permissionFilter"
+              placeholder="Filter permissions by name or description..."
+              class="w-full"
+            />
+          </div>
+          <small class="text-gray-500 mt-1">
+            Showing {{ filteredPermissions.length }} of {{ selectedPermissionUser?.permissions?.length }} permissions
+          </small>
+        </div>
+
         <div
           v-if="selectedPermissionUser?.permissions?.length"
           class="space-y-2"
         >
           <div
-            v-for="permission in selectedPermissionUser.permissions"
+            v-for="permission in filteredPermissions"
             :key="permission.id"
-            class="p-3 bg-gray-50 rounded"
+            class="p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors duration-200"
           >
-            <h4 class="font-medium">{{ permission.name }}</h4>
-            <p class="text-sm text-gray-600">
-              {{ permission.description || 'No description available' }}
-            </p>
-            <p class="text-xs text-gray-500 mt-1">
-              Assigned: {{ formatDate(permission.updatedAt) }}
-            </p>
-            <div class="mt-2">
-              <Tag
-                :value="permission.isActive ? 'Active' : 'Inactive'"
-                :severity="getPermissionStatusSeverity(permission.isActive)"
-                class="text-xs"
-              />
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <h4 class="font-medium">{{ permission.name }}</h4>
+                <p class="text-sm text-gray-600">
+                  {{ permission.description || 'No description available' }}
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                  Assigned: {{ formatDate(permission.updatedAt) }}
+                </p>
+              </div>
+              <div class="ml-4">
+                <Tag
+                  :value="permission.isActive ? 'Active' : 'Inactive'"
+                  :severity="getPermissionStatusSeverity(permission.isActive)"
+                  class="text-xs"
+                />
+              </div>
             </div>
           </div>
+          <div v-if="filteredPermissions.length === 0 && permissionFilter" class="text-center py-8 text-gray-500">
+            <i class="pi pi-search text-3xl mb-2 block"></i>
+            <p class="text-lg font-medium">No permissions found</p>
+            <p class="text-sm">Try adjusting your search criteria</p>
+          </div>
         </div>
-        <div v-else class="text-gray-500">No Permission assigned</div>
+        <div v-else class="text-center py-8 text-gray-500">
+          <i class="pi pi-ban text-3xl mb-2 block"></i>
+          <p class="text-lg font-medium">No permissions assigned</p>
+          <p class="text-sm">This user currently has no permissions</p>
+        </div>
       </div>
     </Dialog>
   </div>
@@ -311,6 +340,10 @@ import Dropdown from 'primevue/dropdown';
 import Tag from 'primevue/tag';
 import Avatar from 'primevue/avatar';
 import Dialog from 'primevue/dialog';
+import Chip from 'primevue/chip';
+import Toolbar from 'primevue/toolbar';
+import Badge from 'primevue/badge';
+import SplitButton from 'primevue/splitbutton';
 
 // Define props and emits
 const props = defineProps<{
@@ -333,6 +366,7 @@ const selectedStatusFilter = ref(null);
 const showInviteDialog = ref(false);
 const showPermissionsDialog = ref(false);
 const selectedPermissionUser = ref(null);
+const permissionFilter = ref('');
 
 // Toast, confirm, and API
 const toast = useToast();
@@ -378,6 +412,26 @@ const filteredUsers = computed(() => {
     } else if (selectedStatusFilter.value === 'unverified') {
       result = result.filter((user) => !user.isVerified);
     }
+  }
+
+  return result;
+});
+
+const filteredPermissions = computed(() => {
+  if (!selectedPermissionUser.value?.permissions) {
+    return [];
+  }
+
+  let result = selectedPermissionUser.value.permissions;
+
+  // Apply permission filter
+  if (permissionFilter.value) {
+    const query = permissionFilter.value.toLowerCase();
+    result = result.filter(
+      (permission) =>
+        permission.name?.toLowerCase().includes(query) ||
+        permission.description?.toLowerCase().includes(query)
+    );
   }
 
   return result;
@@ -729,6 +783,7 @@ const handleUserAction = (user: any, action: string) => {
 
 const viewUserPermissions = (user: any) => {
   selectedPermissionUser.value = user;
+  permissionFilter.value = ''; // Clear filter when opening dialog
   showPermissionsDialog.value = true;
 };
 
@@ -828,6 +883,59 @@ const handleUserInvited = () => {
     life: 3000,
   });
 };
+
+// Method to update user roles directly in the datatable
+const updateUserRole = (userId: string, operation: 'assign' | 'remove', role: any) => {
+  console.log(`Updating user ${userId} - ${operation} role:`, role);
+
+  // Find the user in the local users array
+  const userIndex = users.value.findIndex(user => user.id === userId);
+  if (userIndex === -1) {
+    console.warn(`User ${userId} not found in users array`);
+    return;
+  }
+
+  const user = users.value[userIndex];
+
+  if (operation === 'assign') {
+    // Add role if not already present
+    const roleExists = user.roles?.some(existingRole => existingRole.id === role.id);
+    if (!roleExists) {
+      if (!user.roles) user.roles = [];
+      user.roles.push({
+        id: role.id,
+        name: role.name,
+        description: role.description,
+        isActive: true
+      });
+
+      // Update permission count (approximate - would need actual permissions)
+      user.permissionCount = (user.permissionCount || 0) + 1;
+
+      console.log(`✅ Role ${role.name} added to user ${user.email}`);
+    }
+  } else if (operation === 'remove') {
+    // Remove role if present
+    if (user.roles) {
+      const initialLength = user.roles.length;
+      user.roles = user.roles.filter(existingRole => existingRole.id !== role.id);
+
+      if (user.roles.length < initialLength) {
+        // Update permission count
+        user.permissionCount = Math.max((user.permissionCount || 1) - 1, 0);
+        console.log(`✅ Role ${role.name} removed from user ${user.email}`);
+      }
+    }
+  }
+
+  // Force reactivity update
+  users.value[userIndex] = { ...user };
+};
+
+// Expose methods for parent component access
+defineExpose({
+  updateUserRole
+});
 </script>
 
 <style scoped>

@@ -10,12 +10,14 @@ import { PermissionController } from './controllers/permission.controller';
 import { RBACSetupController } from './controllers/rbac-setup.controller';
 import { UserRoleManagementController } from './controllers/user-role-management.controller';
 import { UserController } from './controllers/user.controller';
+import { AuditTrailController } from './controllers/audit-trail.controller';
 
 // Services
 import { RoleService } from './services/role.service';
 import { PermissionService } from './services/permission.service';
 import { UserRoleSetupService } from './services/user-role-setup.service';
 import { UserService } from './services/user.service';
+import { AuditTrailService } from './services/audit-trail.service';
 
 // Guards
 import { RoleGuard } from './guards/role.guard';
@@ -49,6 +51,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
     PermissionController,
     RBACSetupController,
     UserRoleManagementController,
+    AuditTrailController,
   ],
   providers: [
     // Services
@@ -56,6 +59,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
     RoleService,
     PermissionService,
     UserRoleSetupService,
+    AuditTrailService,
 
     // Guards
     RoleGuard,
@@ -69,6 +73,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
     RoleService,
     PermissionService,
     UserRoleSetupService,
+    AuditTrailService,
   ],
 })
 export class AdminModule {}

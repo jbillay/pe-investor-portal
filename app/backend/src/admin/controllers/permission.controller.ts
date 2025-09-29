@@ -57,7 +57,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Create new permission',
-    description: 'Create a new permission in the system. Requires ADMIN role.',
+    description: 'Create a new permission in the system. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 201,
@@ -79,7 +79,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Get all permissions',
-    description: 'Retrieve all permissions in the system. Requires ADMIN role.',
+    description: 'Retrieve all permissions in the system. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -105,7 +105,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Get permissions by resource',
-    description: 'Retrieve permissions grouped by resource type. Requires ADMIN role.',
+    description: 'Retrieve permissions grouped by resource type. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -128,7 +128,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Get permission by ID',
-    description: 'Retrieve a specific permission by its ID. Requires ADMIN role.',
+    description: 'Retrieve a specific permission by its ID. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -147,7 +147,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Get permission by name',
-    description: 'Retrieve a specific permission by its name. Requires ADMIN or INVESTOR role.',
+    description: 'Retrieve a specific permission by its name. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -158,7 +158,7 @@ export class PermissionController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'name', description: 'Permission name' })
-  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
+  @AdminOnly()
   @Get('name/:name')
   async getPermissionByName(@Param('name') name: string): Promise<PermissionResponseDto> {
     return this.permissionService.getPermissionByName(name);
@@ -166,7 +166,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Update permission',
-    description: 'Update an existing permission. Requires ADMIN role.',
+    description: 'Update an existing permission. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -191,7 +191,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Delete permission',
-    description: 'Soft delete a permission (set as inactive). Requires ADMIN role.',
+    description: 'Soft delete a permission (set as inactive). Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 204,
@@ -214,7 +214,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Assign permission to role',
-    description: 'Assign a specific permission to a role. Requires ADMIN role.',
+    description: 'Assign a specific permission to a role. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -244,7 +244,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Revoke permission from role',
-    description: 'Remove a specific permission from a role. Requires ADMIN role.',
+    description: 'Remove a specific permission from a role. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -273,7 +273,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Bulk assign permissions',
-    description: 'Assign multiple permissions to a role at once. Requires ADMIN role.',
+    description: 'Assign multiple permissions to a role at once. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -311,7 +311,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Get role permissions',
-    description: 'Get all permissions assigned to a specific role. Requires ADMIN or INVESTOR role.',
+    description: 'Get all permissions assigned to a specific role. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -322,7 +322,7 @@ export class PermissionController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'roleId', description: 'Role ID' })
-  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
+  @AdminOnly()
   @Get('role/:roleId')
   async getRolePermissions(@Param('roleId') roleId: string): Promise<RoleWithPermissionsResponseDto> {
     return this.permissionService.getRolePermissions(roleId);
@@ -330,7 +330,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Get user permissions',
-    description: 'Get all permissions for a specific user (aggregated from roles). Requires ADMIN or INVESTOR role.',
+    description: 'Get all permissions for a specific user (aggregated from roles). Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -341,7 +341,7 @@ export class PermissionController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'userId', description: 'User ID' })
-  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
+  @AdminOnly()
   @Get('user/:userId')
   async getUserPermissions(@Param('userId') userId: string): Promise<UserPermissionsResponseDto> {
     return this.permissionService.getUserPermissions(userId);
@@ -365,7 +365,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Check user permission',
-    description: 'Check if a user has a specific permission. Requires ADMIN or INVESTOR role.',
+    description: 'Check if a user has a specific permission. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -377,7 +377,7 @@ export class PermissionController {
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiBody({ type: CheckPermissionDto })
-  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
+  @AdminOnly()
   @Post('check/:userId')
   async checkUserPermission(
     @Param('userId') userId: string,
@@ -408,7 +408,7 @@ export class PermissionController {
 
   @ApiOperation({
     summary: 'Get permissions for resource',
-    description: 'Get all permissions available for a specific resource type. Requires ADMIN or INVESTOR role.',
+    description: 'Get all permissions available for a specific resource type. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,
@@ -418,7 +418,7 @@ export class PermissionController {
   @ApiForbiddenResponse({ description: 'Insufficient permissions' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   @ApiParam({ name: 'resource', description: 'Resource type (e.g., USER, ROLE, PORTFOLIO)' })
-  @RequireAnyRole('SUPER_ADMIN', 'INVESTOR')
+  @AdminOnly()
   @Get('resource/:resource')
   async getPermissionsForResource(@Param('resource') resource: string): Promise<PermissionResponseDto[]> {
     return this.permissionService.getPermissionsForResource(resource);

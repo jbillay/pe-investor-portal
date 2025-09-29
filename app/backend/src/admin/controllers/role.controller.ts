@@ -84,7 +84,7 @@ export class RoleController {
 
   @ApiOperation({
     summary: 'Get all roles',
-    description: 'Retrieve all roles in the system. Requires ADMIN role.',
+    description: 'Retrieve all roles in the system. Requires SUPER_ADMIN role or role management permissions.',
   })
   @ApiResponse({
     status: 200,

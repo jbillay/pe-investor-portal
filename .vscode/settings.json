@@ -1,3 +1,6 @@
 {
-    "oxc.enable": true
+    "oxc.enable": true,
+    "cSpell.words": [
+        "Unkown"
+    ]
 }

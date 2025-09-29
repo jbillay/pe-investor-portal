@@ -26,10 +26,18 @@
     </template>
 
     <div class="user-edit-content h-full overflow-auto custom-scrollbar">
+      <!-- Loading State -->
+      <div v-if="isLoading" class="loading-container flex items-center justify-center h-96">
+        <div class="text-center">
+          <i class="pi pi-spin pi-spinner text-4xl text-blue-600 mb-4"></i>
+          <p class="text-lg text-gray-600">Loading user information...</p>
+        </div>
+      </div>
+
       <!-- Tab Navigation -->
-      <TabView v-model:activeIndex="activeTabIndex" class="user-edit-tabs">
+      <TabView v-else v-model:activeIndex="activeTabIndex" class="user-edit-tabs">
         <!-- Basic Information Tab -->
-        <TabPanel header="Basic Information" class="p-0">
+        <TabPanel header="Basic Information">
           <div class="tab-content p-6">
             <!-- User Avatar Section -->
             <div class="avatar-section mb-6 text-center">
@@ -92,6 +100,15 @@
                 </small>
               </div>
 
+              <div class="form-field">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                <InputText
+                  v-model="formData.phone"
+                  placeholder="Enter phone number (e.g., +1234567890)"
+                  type="tel"
+                  class="w-full"
+                />
+              </div>
 
               <div class="form-field">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
@@ -155,144 +172,48 @@
           </div>
         </TabPanel>
 
-        <!-- Roles & Permissions Tab -->
-        <TabPanel header="Roles & Permissions" class="p-0">
-          <div class="tab-content p-6">
-            <!-- Current Roles Section -->
-            <div class="current-roles-section mb-6">
-              <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <i class="pi pi-shield text-blue-600"></i>
-                Current Roles
-              </h4>
-
-              <div class="roles-list">
-                <div v-if="formData.roles && formData.roles.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div
-                    v-for="role in formData.roles"
-                    :key="role.id"
-                    class="role-card p-4 bg-blue-50 rounded-lg border border-blue-200"
-                  >
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-3">
-                        <div
-                          class="role-icon w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                          :style="{ backgroundColor: getRoleColor(role.name) }"
-                        >
-                          {{ getRoleInitials(role.name) }}
-                        </div>
-                        <div>
-                          <div class="font-semibold text-gray-900">{{ role.name }}</div>
-                          <div class="text-sm text-gray-600">{{ role.description }}</div>
-                        </div>
-                      </div>
-                      <Button
-                        icon="pi pi-times"
-                        class="p-button-rounded p-button-sm p-button-text p-button-danger"
-                        @click="removeRole(role)"
-                        v-tooltip.top="'Remove Role'"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div v-else class="empty-roles text-center py-8 text-gray-500">
-                  <i class="pi pi-shield text-4xl mb-4"></i>
-                  <p class="text-lg mb-2">No roles assigned</p>
-                  <p class="text-sm">Add roles to grant permissions to this user</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Add Role Section -->
-            <div class="add-role-section mb-6">
-              <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <i class="pi pi-plus text-green-600"></i>
-                Add New Role
-              </h4>
-
-              <div class="add-role-form grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Select Role</label>
-                  <Dropdown
-                    v-model="newRole.roleId"
-                    :options="availableRoles"
-                    optionLabel="name"
-                    optionValue="id"
-                    placeholder="Choose a role"
-                    class="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Assignment Reason</label>
-                  <InputText
-                    v-model="newRole.reason"
-                    placeholder="Reason for assignment"
-                    class="w-full"
-                  />
-                </div>
-
-                <div>
-                  <Button
-                    label="Add Role"
-                    icon="pi pi-plus"
-                    class="p-button-primary w-full"
-                    @click="addRole"
-                    :disabled="!newRole.roleId || !newRole.reason"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- Effective Permissions Section -->
-            <div class="permissions-section">
-              <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <i class="pi pi-key text-purple-600"></i>
-                Effective Permissions
-              </h4>
-
-              <div class="permissions-grid">
-                <div v-if="effectivePermissions.length > 0" class="permissions-list max-h-60 overflow-y-auto custom-scrollbar border rounded-lg p-4 bg-gray-50">
-                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                    <div
-                      v-for="permission in effectivePermissions"
-                      :key="permission"
-                      class="permission-chip flex items-center gap-2 px-3 py-1 bg-white rounded-md border text-sm"
-                    >
-                      <i class="pi pi-check text-green-600 text-xs"></i>
-                      <span class="text-gray-700">{{ permission }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-else class="empty-permissions text-center py-8 text-gray-500">
-                  <i class="pi pi-key text-4xl mb-4"></i>
-                  <p class="text-lg mb-2">No permissions</p>
-                  <p class="text-sm">User will receive permissions when roles are assigned</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </TabPanel>
 
         <!-- Activity Log Tab -->
-        <TabPanel header="Activity Log" class="p-0">
+        <TabPanel header="Activity Log">
           <div class="tab-content p-6">
             <div class="activity-header mb-4 flex items-center justify-between">
               <h4 class="text-lg font-medium text-gray-900 flex items-center gap-2">
                 <i class="pi pi-history text-indigo-600"></i>
                 User Activity Log
               </h4>
-              <Button
-                label="View Full Audit Trail"
-                icon="pi pi-external-link"
-                class="p-button-outlined p-button-sm"
-                @click="viewFullAuditTrail"
-              />
+              <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
+                  <label class="text-sm font-medium text-gray-700">Time Period:</label>
+                  <Dropdown
+                    v-model="selectedTimePeriod"
+                    :options="timePeriodOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Select period"
+                    class="w-40"
+                    @change="loadUserAuditLogs"
+                  />
+                </div>
+                <Button
+                  label="View Full Audit Trail"
+                  icon="pi pi-external-link"
+                  class="p-button-outlined p-button-sm"
+                  @click="viewFullAuditTrail"
+                />
+              </div>
             </div>
 
             <div class="activity-timeline">
-              <div v-if="userActivities.length > 0" class="space-y-4">
+              <!-- Loading state -->
+              <div v-if="isLoadingAuditLogs" class="flex items-center justify-center py-8">
+                <div class="text-center">
+                  <i class="pi pi-spin pi-spinner text-3xl text-blue-600 mb-3"></i>
+                  <p class="text-gray-600">Loading activity logs...</p>
+                </div>
+              </div>
+
+              <!-- Activity logs -->
+              <div v-else-if="userActivities.length > 0" class="space-y-4">
                 <div
                   v-for="activity in userActivities"
                   :key="activity.id"
@@ -322,95 +243,32 @@
 
               <div v-else class="empty-activity text-center py-8 text-gray-500">
                 <i class="pi pi-history text-4xl mb-4"></i>
-                <p class="text-lg mb-2">No activity recorded</p>
-                <p class="text-sm">User activity will appear here once they start using the system</p>
+                <p class="text-lg mb-2">No activity found</p>
+                <p class="text-sm">No audit logs found for the selected time period</p>
+                <Button
+                  label="Try Different Period"
+                  icon="pi pi-refresh"
+                  class="p-button-text p-button-sm mt-3"
+                  @click="selectedTimePeriod = 0"
+                />
               </div>
             </div>
           </div>
         </TabPanel>
 
         <!-- Security Settings Tab -->
-        <TabPanel header="Security" class="p-0">
+        <TabPanel header="Security" :disabled="true">
           <div class="tab-content p-6">
-            <!-- Account Security Section -->
-            <div class="security-section mb-6">
-              <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <i class="pi pi-lock text-red-600"></i>
-                Account Security
-              </h4>
-
-              <div class="security-options space-y-4">
-                <div class="security-option flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-                  <div>
-                    <div class="font-medium text-gray-900">Force Password Reset</div>
-                    <div class="text-sm text-gray-600">User will be required to change password on next login</div>
-                  </div>
-                  <Button
-                    label="Force Reset"
-                    icon="pi pi-key"
-                    class="p-button-outlined p-button-sm"
-                    @click="forcePasswordReset"
-                  />
-                </div>
-
-                <div class="security-option flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-                  <div>
-                    <div class="font-medium text-gray-900">Multi-Factor Authentication</div>
-                    <div class="text-sm text-gray-600">Require MFA for enhanced security</div>
-                  </div>
-                  <InputSwitch
-                    v-model="formData.mfaEnabled"
-                    @change="toggleMFA"
-                  />
-                </div>
-
-                <div class="security-option flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-                  <div>
-                    <div class="font-medium text-gray-900">Account Locked</div>
-                    <div class="text-sm text-gray-600">Temporarily suspend user account access</div>
-                  </div>
-                  <InputSwitch
-                    v-model="formData.isLocked"
-                    @change="toggleAccountLock"
-                  />
-                </div>
+            <!-- Under Development Message -->
+            <div class="flex flex-col items-center justify-center h-64 text-center">
+              <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <i class="pi pi-lock text-4xl text-gray-400"></i>
               </div>
-            </div>
-
-            <!-- Session Management -->
-            <div class="session-section">
-              <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <i class="pi pi-desktop text-blue-600"></i>
-                Session Management
-              </h4>
-
-              <div class="session-actions grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button
-                  label="Terminate All Sessions"
-                  icon="pi pi-sign-out"
-                  class="p-button-danger p-button-outlined"
-                  @click="terminateAllSessions"
-                />
-
-                <Button
-                  label="View Login History"
-                  icon="pi pi-history"
-                  class="p-button-outlined"
-                  @click="viewLoginHistory"
-                />
-              </div>
-
-              <!-- Last Login Information -->
-              <div class="last-login-info mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <div class="flex items-center gap-2 mb-2">
-                  <i class="pi pi-info-circle text-blue-600"></i>
-                  <span class="font-medium text-blue-900">Last Login Information</span>
-                </div>
-                <div class="text-sm text-blue-800">
-                  <div>Time: {{ formData.lastLogin ? formatDateTime(formData.lastLogin) : 'Never' }}</div>
-                  <div>IP Address: {{ formData.lastLoginIP || 'Unknown' }}</div>
-                  <div>Location: {{ formData.lastLoginLocation || 'Unknown' }}</div>
-                </div>
+              <h4 class="text-xl font-semibold text-gray-600 mb-2">Security Settings</h4>
+              <p class="text-gray-500 mb-4">This section is currently under development</p>
+              <div class="flex items-center gap-2 text-sm text-gray-400">
+                <i class="pi pi-wrench"></i>
+                <span>Coming soon...</span>
               </div>
             </div>
           </div>
@@ -458,6 +316,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
+import { useApi } from '@/composables/useApi';
 
 // PrimeVue Components
 import Button from 'primevue/button';
@@ -468,6 +327,8 @@ import InputSwitch from 'primevue/inputswitch';
 import Tag from 'primevue/tag';
 import Avatar from 'primevue/avatar';
 import Dialog from 'primevue/dialog';
+import TabPanel from 'primevue/tabpanel';
+import TabView from 'primevue/tabview';
 
 // Props
 const props = defineProps<{
@@ -483,13 +344,17 @@ const emit = defineEmits<{
 
 // Composables
 const toast = useToast();
+const { api } = useApi();
 
 // State
 const dialogVisible = ref(props.visible);
 const activeTabIndex = ref(0);
 const isSaving = ref(false);
+const isLoading = ref(false);
+const isLoadingAuditLogs = ref(false);
 const showValidationErrors = ref(false);
 const imageUploadInput = ref(null);
+const selectedTimePeriod = ref(30);
 
 // Form data
 const formData = ref({
@@ -497,6 +362,7 @@ const formData = ref({
   firstName: '',
   lastName: '',
   email: '',
+  phone: '',
   timezone: 'UTC',
   language: 'en',
   isActive: true,
@@ -510,12 +376,7 @@ const formData = ref({
   lastLoginAt: null,
   createdAt: null,
   updatedAt: null,
-});
-
-// New role assignment
-const newRole = ref({
-  roleId: '',
-  reason: '',
+  preferences: null,
 });
 
 // Options data
@@ -543,41 +404,18 @@ const languageOptions = [
   { label: 'Japanese', value: 'ja' },
 ];
 
-const availableRoles = ref([
-  { id: '1', name: 'SUPER_ADMIN', description: 'System administrators with full access' },
-  { id: '2', name: 'FUND_MANAGER', description: 'Fund management team with operational access' },
-  { id: '3', name: 'COMPLIANCE_OFFICER', description: 'Compliance and regulatory oversight' },
-  { id: '4', name: 'ANALYST', description: 'Read-only access for analysis and reporting' },
-  { id: '5', name: 'INVESTOR', description: 'Limited partners with access to their investments' },
-  { id: '6', name: 'VIEWER', description: 'Minimum access for basic information' },
-]);
+// Time period options for audit log filtering
+const timePeriodOptions = [
+  { label: 'All Time', value: 0 },
+  { label: 'Last 7 days', value: 7 },
+  { label: 'Last 30 days', value: 30 },
+  { label: 'Last 90 days', value: 90 },
+  { label: 'Last 180 days', value: 180 },
+  { label: 'Last Year', value: 365 }
+];
 
-const userActivities = ref([
-  {
-    id: '1',
-    type: 'LOGIN',
-    title: 'User Login',
-    description: 'Successful login from desktop application',
-    performedBy: 'System',
-    timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-  },
-  {
-    id: '2',
-    type: 'ROLE_ASSIGNED',
-    title: 'Role Assignment',
-    description: 'FUND_MANAGER role assigned to user',
-    performedBy: 'Admin User',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-  },
-  {
-    id: '3',
-    type: 'PROFILE_UPDATED',
-    title: 'Profile Updated',
-    description: 'User profile information was updated',
-    performedBy: 'User',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-  },
-]);
+// User activities - will be loaded from API
+const userActivities = ref([]);
 
 // Computed properties
 const isNewUser = computed(() => !props.user || !props.user.id);
@@ -597,24 +435,10 @@ const canSaveUser = computed(() => {
          formData.value.lastName.trim() &&
          formData.value.email.trim() &&
          isValidEmail(formData.value.email) &&
-         !isSaving.value;
+         !isSaving.value &&
+         !isLoading.value;
 });
 
-const effectivePermissions = computed(() => {
-  // Mock calculation of effective permissions based on roles
-  const permissions = [];
-  formData.value.roles.forEach(role => {
-    // Add role-specific permissions (this would be fetched from API in real app)
-    if (role.name === 'SUPER_ADMIN') {
-      permissions.push('USER:CREATE', 'USER:READ', 'USER:UPDATE', 'USER:DELETE', 'SYSTEM:CONFIGURE');
-    } else if (role.name === 'FUND_MANAGER') {
-      permissions.push('FUND:CREATE', 'FUND:READ', 'FUND:UPDATE', 'INVESTMENT:CREATE');
-    } else if (role.name === 'INVESTOR') {
-      permissions.push('INVESTMENT:READ_OWN', 'DOCUMENT:READ');
-    }
-  });
-  return [...new Set(permissions)]; // Remove duplicates
-});
 
 // Watchers
 watch(() => props.visible, (newValue) => {
@@ -625,9 +449,17 @@ watch(dialogVisible, (newValue) => {
   emit('update:visible', newValue);
 });
 
-watch(() => props.user, (newUser) => {
+watch(() => props.user, async (newUser) => {
   if (newUser) {
-    loadUserData();
+    await loadUserData();
+    await loadUserAuditLogs();
+  }
+});
+
+// Watch time period changes to reload audit logs
+watch(selectedTimePeriod, async (newPeriod) => {
+  if (formData.value.id && dialogVisible.value) {
+    await loadUserAuditLogs();
   }
 });
 
@@ -637,21 +469,6 @@ const isValidEmail = (email: string) => {
   return emailRegex.test(email);
 };
 
-const getRoleColor = (roleName: string) => {
-  const colors: Record<string, string> = {
-    'SUPER_ADMIN': '#ef4444',
-    'FUND_MANAGER': '#8b5cf6',
-    'COMPLIANCE_OFFICER': '#f59e0b',
-    'ANALYST': '#06b6d4',
-    'INVESTOR': '#10b981',
-    'VIEWER': '#6b7280',
-  };
-  return colors[roleName] || '#6366f1';
-};
-
-const getRoleInitials = (roleName: string) => {
-  return roleName.split('_').map(word => word[0]).join('').toUpperCase();
-};
 
 const getActivityIconClass = (type: string) => {
   const classes = {
@@ -713,7 +530,111 @@ const formatDateTime = (date: Date) => {
   }).format(new Date(date));
 };
 
-const loadUserData = () => {
+const loadUserData = async () => {
+  if (props.user && props.user.id) {
+    isLoading.value = true;
+
+    try {
+      // Fetch complete user data including profile information from backend
+      const response = await api.get(`/admin/users/${props.user.id}`);
+
+      // Log the response to understand the structure
+      console.log('Full API Response:', response);
+      console.log('Response data field:', response.data);
+
+      // Try different possible locations for the user data
+      let userData = response.data;
+
+      // If response.data doesn't have the expected user fields, try response itself
+      if (!userData || !userData.id) {
+        console.log('Trying response directly...');
+        userData = response;
+      }
+
+      if (!userData || typeof userData !== 'object') {
+        console.warn('No user data in response, falling back to props');
+        console.log('userData type:', typeof userData);
+        console.log('userData value:', userData);
+        loadUserDataFromProps();
+        return;
+      }
+
+      console.log('User data:', userData);
+
+      // Calculate account age in days with safe access
+      let accountAge = 0;
+      try {
+        if (userData.createdAt) {
+          const createdDate = new Date(userData.createdAt);
+          if (!isNaN(createdDate.getTime())) {
+            accountAge = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+          }
+        }
+      } catch (dateError) {
+        console.warn('Failed to calculate account age:', dateError);
+        accountAge = 0;
+      }
+
+      formData.value = {
+        id: userData.id || '',
+        firstName: userData.firstName || '',
+        lastName: userData.lastName || '',
+        email: userData.email || '',
+        phone: userData.profile?.phone || '',
+        timezone: userData.profile?.timezone || 'UTC',
+        language: userData.profile?.language || 'en',
+        isActive: userData.isActive !== undefined ? userData.isActive : true,
+        isVerified: userData.isVerified !== undefined ? userData.isVerified : false,
+        profileImage: userData.profile?.avatar || '',
+        roles: userData.roles || [],
+        permissions: userData.permissions || [],
+        permissionCount: userData.permissions?.length || 0,
+        loginCount: userData.stats?.loginCount || 0,
+        accountAge,
+        lastLoginAt: userData.lastLogin || null,
+        createdAt: userData.createdAt || null,
+        updatedAt: userData.updatedAt || null,
+        preferences: userData.profile?.preferences || null,
+        mfaEnabled: userData.mfaEnabled || false,
+        isLocked: userData.isLocked || false,
+        lastLoginIP: userData.lastLoginIP || '',
+        lastLoginLocation: userData.lastLoginLocation || '',
+      };
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+
+      // Fall back to props data if API call fails
+      loadUserDataFromProps();
+
+      // Only show toast for non-404 errors (404 means endpoint doesn't exist yet)
+      if (error.response?.status !== 404) {
+        toast.add({
+          severity: 'warn',
+          summary: 'Data Loading Warning',
+          detail: error.message || 'Some user data may not be complete. Please refresh and try again.',
+          life: 5000
+        });
+      } else {
+        console.info('User detail endpoint not available, using basic user data from props');
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  } else if (props.user) {
+    // For users without ID (partial data), use props as fallback
+    loadUserDataFromProps();
+  } else {
+    resetForm();
+  }
+};
+
+// Fallback method to load data from props
+const loadUserDataFromProps = () => {
   if (props.user) {
     // Calculate account age in days
     const accountAge = props.user.createdAt
@@ -725,6 +646,7 @@ const loadUserData = () => {
       firstName: props.user.firstName || '',
       lastName: props.user.lastName || '',
       email: props.user.email || '',
+      phone: props.user.phone || '',
       timezone: props.user.timezone || 'UTC',
       language: props.user.language || 'en',
       isActive: props.user.isActive !== undefined ? props.user.isActive : true,
@@ -738,13 +660,12 @@ const loadUserData = () => {
       lastLoginAt: props.user.lastLoginAt || null,
       createdAt: props.user.createdAt || null,
       updatedAt: props.user.updatedAt || null,
+      preferences: props.user.preferences || null,
       mfaEnabled: props.user.mfaEnabled || false,
       isLocked: props.user.isLocked || false,
       lastLoginIP: props.user.lastLoginIP || '',
       lastLoginLocation: props.user.lastLoginLocation || '',
     };
-  } else {
-    resetForm();
   }
 };
 
@@ -754,6 +675,7 @@ const resetForm = () => {
     firstName: '',
     lastName: '',
     email: '',
+    phone: '',
     timezone: 'UTC',
     language: 'en',
     isActive: true,
@@ -767,51 +689,16 @@ const resetForm = () => {
     lastLoginAt: null,
     createdAt: null,
     updatedAt: null,
+    preferences: null,
     mfaEnabled: false,
     isLocked: false,
     lastLoginIP: '',
     lastLoginLocation: '',
   };
-  newRole.value = { roleId: '', reason: '' };
   activeTabIndex.value = 0;
   showValidationErrors.value = false;
 };
 
-const addRole = () => {
-  if (!newRole.value.roleId || !newRole.value.reason) return;
-
-  const role = availableRoles.value.find(r => r.id === newRole.value.roleId);
-  if (role && !formData.value.roles.find(r => r.id === role.id)) {
-    formData.value.roles.push({
-      ...role,
-      assignedAt: new Date(),
-      assignedBy: 'Current Admin',
-      reason: newRole.value.reason
-    });
-
-    toast.add({
-      severity: 'success',
-      summary: 'Role Added',
-      detail: `${role.name} role has been added to the user.`,
-      life: 3000
-    });
-
-    newRole.value = { roleId: '', reason: '' };
-  }
-};
-
-const removeRole = (role: any) => {
-  const index = formData.value.roles.findIndex(r => r.id === role.id);
-  if (index > -1) {
-    formData.value.roles.splice(index, 1);
-    toast.add({
-      severity: 'info',
-      summary: 'Role Removed',
-      detail: `${role.name} role has been removed from the user.`,
-      life: 3000
-    });
-  }
-};
 
 const openImageUpload = () => {
   imageUploadInput.value?.click();
@@ -886,12 +773,61 @@ const viewFullAuditTrail = () => {
   });
 };
 
-const onDialogShow = () => {
-  loadUserData();
+const onDialogShow = async () => {
+  await loadUserData();
+  await loadUserAuditLogs();
 };
 
 const onDialogHide = () => {
   resetForm();
+  userActivities.value = []; // Clear audit logs when dialog closes
+};
+
+// Load user audit logs from API
+const loadUserAuditLogs = async () => {
+  if (!formData.value.id) {
+    userActivities.value = [];
+    return;
+  }
+
+  isLoadingAuditLogs.value = true;
+
+  try {
+    const response = await api.get(`/admin/users/${formData.value.id}/audit-logs`, {
+      params: {
+        days: selectedTimePeriod.value,
+        limit: 50
+      }
+    });
+
+    console.log('Audit logs response:', response);
+
+    // The response should have the activities in the data field
+    userActivities.value = response.data?.data || response.data || [];
+
+    if (userActivities.value.length === 0) {
+      console.log(`No audit logs found for user ${formData.value.id} in the last ${selectedTimePeriod.value} days`);
+    }
+
+  } catch (error) {
+    console.error('Failed to load user audit logs:', error);
+
+    // Don't show error toast for 404 (endpoint might not be implemented yet)
+    if (error.response?.status !== 404) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Audit Logs Unavailable',
+        detail: 'Could not load user activity logs. Please try again later.',
+        life: 4000
+      });
+    } else {
+      console.info('Audit logs endpoint not available yet');
+    }
+
+    userActivities.value = [];
+  } finally {
+    isLoadingAuditLogs.value = false;
+  }
 };
 
 const closeDialog = () => {
@@ -914,11 +850,83 @@ const saveUser = async () => {
   isSaving.value = true;
 
   try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    let result;
 
-    const result = {
-      userId: formData.value.id || 'new-user-id',
+    if (isNewUser.value) {
+      // Create new user
+      const createUserData = {
+        email: formData.value.email,
+        password: generateTempPassword(), // Generate a temporary password
+        firstName: formData.value.firstName,
+        lastName: formData.value.lastName,
+        phone: formData.value.phone || undefined,
+        timezone: formData.value.timezone,
+        language: formData.value.language,
+        isActive: formData.value.isActive,
+        isVerified: formData.value.isVerified,
+        preferences: formData.value.preferences || undefined,
+        reason: 'User created via admin panel'
+      };
+
+      const createResponse = await api.post('/admin/users', createUserData);
+      result = createResponse.data;
+
+      toast.add({
+        severity: 'success',
+        summary: 'User Created',
+        detail: `${fullName.value} has been created successfully.`,
+        life: 5000
+      });
+    } else {
+      // Update existing user
+      const updateUserData = {
+        email: formData.value.email,
+        firstName: formData.value.firstName,
+        lastName: formData.value.lastName,
+        phone: formData.value.phone || undefined,
+        timezone: formData.value.timezone,
+        language: formData.value.language,
+        preferences: formData.value.preferences || undefined,
+        reason: 'User updated via admin panel'
+      };
+
+      const updateResponse = await api.put(`/admin/users/${formData.value.id}`, updateUserData);
+      result = updateResponse.data;
+
+      // Handle status and verification updates separately if they changed
+      const currentUser = props.user;
+      if (currentUser && (
+        currentUser.isActive !== formData.value.isActive ||
+        currentUser.isVerified !== formData.value.isVerified
+      )) {
+        // Update status if changed
+        if (currentUser.isActive !== formData.value.isActive) {
+          await api.patch(`/admin/users/${formData.value.id}/status`, {
+            isActive: formData.value.isActive,
+            reason: `User ${formData.value.isActive ? 'activated' : 'deactivated'} via admin panel`
+          });
+        }
+
+        // Update verification if changed
+        if (currentUser.isVerified !== formData.value.isVerified) {
+          await api.patch(`/admin/users/${formData.value.id}/verification`, {
+            isVerified: formData.value.isVerified,
+            reason: `User verification ${formData.value.isVerified ? 'confirmed' : 'revoked'} via admin panel`
+          });
+        }
+      }
+
+      toast.add({
+        severity: 'success',
+        summary: 'User Updated',
+        detail: `${fullName.value} has been updated successfully.`,
+        life: 5000
+      });
+    }
+
+    // Emit the result to parent component
+    emit('user-updated', {
+      userId: result?.id || formData.value.id,
       firstName: formData.value.firstName,
       lastName: formData.value.lastName,
       email: formData.value.email,
@@ -927,26 +935,26 @@ const saveUser = async () => {
       isActive: formData.value.isActive,
       isVerified: formData.value.isVerified,
       isNewUser: isNewUser.value,
-      rolesAssigned: formData.value.roles.length,
       updatedAt: new Date(),
-    };
-
-    emit('user-updated', result);
-
-    toast.add({
-      severity: 'success',
-      summary: isNewUser.value ? 'User Created' : 'User Updated',
-      detail: `${fullName.value} has been ${isNewUser.value ? 'created' : 'updated'} successfully.`,
-      life: 5000
     });
 
     closeDialog();
   } catch (error) {
     console.error('User save error:', error);
+
+    let errorMessage = `Failed to ${isNewUser.value ? 'create' : 'update'} user. Please try again.`;
+
+    // Handle specific API error messages
+    if (error?.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+
     toast.add({
       severity: 'error',
       summary: 'Save Failed',
-      detail: `Failed to ${isNewUser.value ? 'create' : 'update'} user. Please try again.`,
+      detail: errorMessage,
       life: 5000
     });
   } finally {
@@ -954,10 +962,30 @@ const saveUser = async () => {
   }
 };
 
+// Helper function to generate temporary password for new users
+const generateTempPassword = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@$!%*?&';
+  let password = '';
+
+  // Ensure password meets requirements (uppercase, lowercase, number, special char)
+  password += 'A'; // uppercase
+  password += 'a'; // lowercase
+  password += '1'; // number
+  password += '@'; // special char
+
+  // Add 8 more random characters to make it 12 chars total
+  for (let i = 0; i < 8; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+};
+
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
   if (props.user) {
-    loadUserData();
+    await loadUserData();
   }
 });
 </script>
@@ -1013,18 +1041,6 @@ onMounted(() => {
 
 .form-field {
   @apply space-y-2;
-}
-
-.role-card {
-  @apply transition-all duration-200 hover:shadow-md;
-}
-
-.role-icon {
-  @apply shadow-sm border border-white/20;
-}
-
-.permission-chip {
-  @apply shadow-sm;
 }
 
 .activity-item {

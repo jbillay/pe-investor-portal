@@ -71,14 +71,6 @@
                 <i class="pi pi-key"></i>
                 <span v-show="!sidebarCollapsed">Roles</span>
               </button>
-              <button
-                @click="setActiveSection('permissions')"
-                :class="['nav-item', { 'nav-item-active': activeSection === 'permissions' }]"
-                :title="sidebarCollapsed ? 'Permission Matrix' : ''"
-              >
-                <i class="pi pi-lock"></i>
-                <span v-show="!sidebarCollapsed">Permissions</span>
-              </button>
             </div>
           </div>
 
@@ -140,9 +132,10 @@
             <transition name="section-transition" mode="out-in">
               <UserManagementPanel
                 v-if="activeSection === 'users'"
+                ref="userManagementPanelComponent"
                 v-model:selectedUsers="selectedUsers"
                 @edit-user="editUser"
-                @assign-role="showRoleAssignmentDialog"
+                @assign-role="showRoleManagementDialog"
                 @bulk-action="handleBulkAction"
               />
               <RoleManagementPanel
@@ -150,9 +143,6 @@
                 @edit-role="editRole"
                 @create-role="createRole"
                 @assign-permissions="showPermissionDialog"
-              />
-              <PermissionMatrixPanel
-                v-else-if="activeSection === 'permissions'"
               />
               <SystemAnalyticsPanel
                 v-else-if="activeSection === 'analytics'"
@@ -185,11 +175,13 @@
       </div>
     </Dialog>
 
-    <!-- Role Assignment Dialog -->
-    <RoleAssignmentDialog
+    <!-- Role Management Dialog -->
+    <RoleManagementDialog
       v-model:visible="roleAssignmentVisible"
       :user="selectedUser"
       @role-assigned="handleRoleAssigned"
+      @role-revoked="handleRoleRevoked"
+      @user-role-updated="handleUserRoleUpdated"
     />
 
     <!-- Bulk Operations Dialog -->
@@ -235,13 +227,26 @@ import Dialog from 'primevue/dialog';
 // Import all child components
 import UserManagementPanel from '@/components/admin/UserManagementPanel.vue';
 import RoleManagementPanel from '@/components/admin/RoleManagementPanel.vue';
-import PermissionMatrixPanel from '@/components/admin/PermissionMatrixPanel.vue';
 import SystemAnalyticsPanel from '@/components/admin/SystemAnalyticsPanel.vue';
-import RoleAssignmentDialog from '@/components/admin/RoleAssignmentDialog.vue';
+import RoleManagementDialog from '@/components/admin/RoleManagementDialog.vue';
 import BulkOperationsDialog from '@/components/admin/BulkOperationsDialog.vue';
 import PermissionManagementDialog from '@/components/admin/PermissionManagementDialog.vue';
 import AuditTrailDialog from '@/components/admin/AuditTrailDialog.vue';
 import UserEditDialog from '@/components/admin/UserEditDialog.vue';
+
+interface UserWithRoles {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  name?: string;
+  roles?: Array<{
+    id?: string;
+    name: string;
+    description?: string;
+  }>;
+}
 
 // Composables
 const router = useRouter();
@@ -255,6 +260,7 @@ const sidebarCollapsed = ref(false);
 const selectedUsers = ref([]);
 const selectedUser = ref(null);
 const selectedRole = ref(null);
+const userManagementPanelComponent = ref(null);
 
 // Dialog visibility
 const showInviteDialog = ref(false);
@@ -280,7 +286,6 @@ const currentSectionTitle = computed(() => {
   const titles = {
     users: 'User Management',
     roles: 'Role Management',
-    permissions: 'Permission Matrix',
     analytics: 'System Analytics'
   };
   return titles[activeSection.value] || 'Administration';
@@ -290,7 +295,6 @@ const currentSectionDescription = computed(() => {
   const descriptions = {
     users: 'Manage user accounts, profiles, and access settings',
     roles: 'Create and configure user roles with specific permissions',
-    permissions: 'Visualize and manage role-permission relationships',
     analytics: 'Monitor system performance and security metrics'
   };
   return descriptions[activeSection.value] || '';
@@ -331,16 +335,6 @@ const currentSectionActions = computed(() => {
         icon: 'pi pi-upload',
         class: 'p-button-outlined',
         handler: () => console.log('Import roles'),
-        disabled: false
-      }
-    ],
-    permissions: [
-      {
-        key: 'export',
-        label: 'Export Matrix',
-        icon: 'pi pi-download',
-        class: 'p-button-outlined',
-        handler: () => console.log('Export matrix'),
         disabled: false
       }
     ],
@@ -407,7 +401,7 @@ const editUser = (user: any) => {
   userEditVisible.value = true;
 };
 
-const showRoleAssignmentDialog = (user: any) => {
+const showRoleManagementDialog = (user: UserWithRoles) => {
   selectedUser.value = user;
   roleAssignmentVisible.value = true;
 };
@@ -451,6 +445,27 @@ const handleRoleAssigned = (result: any) => {
   // Refresh data
   roleAssignmentVisible.value = false;
   selectedUser.value = null;
+};
+
+const handleRoleRevoked = (result: any) => {
+  toast.add({
+    severity: 'success',
+    summary: 'Roles Revoked',
+    detail: `Successfully removed ${result.revokedRoles.length} role(s) from ${result.userName}`,
+    life: 4000
+  });
+  // Refresh data
+  roleAssignmentVisible.value = false;
+  selectedUser.value = null;
+};
+
+const handleUserRoleUpdated = (data: { userId: string; operation: 'assign' | 'remove'; role: any; updatedUser: any }) => {
+  console.log('User role updated:', data);
+
+  // Forward the update to UserManagementPanel for direct datatable update
+  if (userManagementPanelComponent.value && userManagementPanelComponent.value.updateUserRole) {
+    userManagementPanelComponent.value.updateUserRole(data.userId, data.operation, data.role);
+  }
 };
 
 const handleBulkCompleted = (result: any) => {

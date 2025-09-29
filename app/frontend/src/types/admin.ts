@@ -85,3 +85,22 @@ export interface QueryUsersDto {
   createdAfter?: string;
   createdBefore?: string;
 }
+
+export interface RoleResponseDto {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  isDefault: boolean;
+  permissions: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Permission {
+  id: string;
+  name: string;
+  description?: string;
+  resource: string;
+  action: string;
+}

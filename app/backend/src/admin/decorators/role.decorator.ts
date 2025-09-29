@@ -38,13 +38,13 @@ export const RequireAnyPermission = (...permissions: string[]) =>
  * Composite decorator for admin-only endpoints
  * Equivalent to @RequireRoles('ADMIN')
  */
-export const AdminOnly = () => RequireRoles('ADMIN');
+export const AdminOnly = () => RequireRoles('SUPER_ADMIN');
 
 /**
  * Composite decorator for admin or investor endpoints
  * Equivalent to @RequireAnyRole('ADMIN', 'INVESTOR')
  */
-export const AdminOrInvestor = () => RequireAnyRole('ADMIN', 'INVESTOR');
+export const AdminOrInvestor = () => RequireAnyRole('SUPER_ADMIN', 'INVESTOR');
 
 /**
  * Composite decorator for user management permissions

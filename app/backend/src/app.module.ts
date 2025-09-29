@@ -12,6 +12,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
 import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { PrismaService } from './common/prisma/prisma.service';
+import { CommonServicesModule } from './common/services/common-services.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { PrismaService } from './common/prisma/prisma.service';
       envFilePath: ['.env.local', '.env'],
     }),
     EventEmitterModule.forRoot(),
+    CommonServicesModule,
     AuthModule,
     AdminModule,
     InvestmentModule,

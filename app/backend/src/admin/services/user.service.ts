@@ -7,9 +7,10 @@ import {
   Logger,
   InternalServerErrorException
 } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AuditLoggerService } from '../../common/services/audit-logger.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { plainToClass } from 'class-transformer';
@@ -66,7 +67,8 @@ export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventEmitter: EventEmitter2,
+    private readonly auditLogger: AuditLoggerService
   ) {
     this.saltRounds = this.config.get<number>('auth.saltRounds', 12);
     this.maxUsersPerBulkOperation = this.config.get<number>('user.maxBulkOperationSize', 100);
@@ -231,6 +233,15 @@ export class UserService {
       const totalPages = Math.ceil(total / limit);
 
       // Log access for audit
+      await this.auditLogger.logUserEvent(
+        'USER_VIEWED',
+        requestingUserId,
+        undefined,
+        undefined,
+        undefined,
+        { action: 'USER_LIST_ACCESSED', filters: query, resultCount: users.length }
+      );
+
       this.eventEmitter.emit('user.list.accessed', {
         requestingUserId,
         filters: query,
@@ -310,6 +321,15 @@ export class UserService {
       userResponse.stats = await this.getUserStats(id);
 
       // Log access for audit
+      await this.auditLogger.logUserEvent(
+        'USER_VIEWED',
+        requestingUserId,
+        id,
+        undefined,
+        undefined,
+        { action: 'USER_DETAILS_ACCESSED' }
+      );
+
       this.eventEmitter.emit('user.details.accessed', {
         requestingUserId,
         targetUserId: id,
@@ -437,6 +457,16 @@ export class UserService {
 
       response.emailVerificationToken = emailVerificationToken;
 
+      // Log audit event
+      await this.auditLogger.logUserEvent(
+        'USER_CREATED',
+        createdById,
+        result.id,
+        undefined,
+        undefined,
+        { email: result.email, roles: createUserDto.roles }
+      );
+
       // Emit events for notifications
       this.eventEmitter.emit('user.created', {
         user: response,
@@ -533,6 +563,16 @@ export class UserService {
       });
 
       response.stats = await this.getUserStats(id);
+
+      // Log audit event
+      await this.auditLogger.logUserEvent(
+        'USER_UPDATED',
+        updatedById,
+        id,
+        undefined,
+        undefined,
+        { changes: updateUserDto, reason: updateUserDto.reason }
+      );
 
       // Emit event
       this.eventEmitter.emit('user.updated', {
@@ -888,7 +928,7 @@ export class UserService {
       // Start transaction
       await this.prisma.$transaction(async (tx: any) => {
         for (const role of roles) {
-          // Check if role already assigned
+          // Check if role already assigned and active
           const existingAssignment = await tx.userRole.findFirst({
             where: {
               userId: id,
@@ -898,9 +938,19 @@ export class UserService {
           });
 
           if (!existingAssignment) {
-            // Create user role
-            await tx.userRole.create({
-              data: {
+            // Use upsert to handle potential unique constraint violations
+            await tx.userRole.upsert({
+              where: {
+                userId_roleId: {
+                  userId: id,
+                  roleId: role.id
+                }
+              },
+              update: {
+                isActive: true,
+                updatedAt: new Date()
+              },
+              create: {
                 userId: id,
                 roleId: role.id,
                 isActive: true
@@ -921,6 +971,16 @@ export class UserService {
           }
         }
       });
+
+      // Log audit event
+      await this.auditLogger.logUserEvent(
+        'ROLE_ASSIGNED',
+        assignedById,
+        id,
+        undefined,
+        undefined,
+        { roles: assignRolesDto.roles, reason: assignRolesDto.reason }
+      );
 
       // Emit event
       this.eventEmitter.emit('user.roles.assigned', {
@@ -1006,6 +1066,16 @@ export class UserService {
           });
         }
       });
+
+      // Log audit event
+      await this.auditLogger.logUserEvent(
+        'ROLE_REVOKED',
+        revokedById,
+        id,
+        undefined,
+        undefined,
+        { roles: revokeRolesDto.roles, reason: revokeRolesDto.reason }
+      );
 
       // Emit event
       this.eventEmitter.emit('user.roles.revoked', {
@@ -1295,5 +1365,172 @@ export class UserService {
       }
       // Add more periods as needed
     ];
+  }
+
+  /**
+   * Get audit logs for a specific user
+   */
+  async getUserAuditLogs(
+    userId: string,
+    options: { days?: number; limit?: number; action?: string },
+    requestedBy: string
+  ) {
+    const { days = 30, limit = 50, action } = options;
+
+    // Verify user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID "${userId}" not found`);
+    }
+
+    // Calculate date range
+    const dateFilter = days > 0 ? {
+      gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    } : undefined;
+
+    // Build where clause
+    const where: any = {
+      userId: userId,
+      ...(dateFilter && { createdAt: dateFilter }),
+      ...(action && { action })
+    };
+
+    // Fetch audit logs
+    const auditLogs = await this.prisma.auditLog.findMany({
+      where,
+      take: Math.min(limit, 100), // Cap at 100 items
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        action: true,
+        resource: true,
+        details: true,
+        ipAddress: true,
+        userAgent: true,
+        createdAt: true
+      }
+    });
+
+    // Transform the data for frontend consumption
+    const activities = auditLogs.map(log => {
+      // Generate human-readable title and description
+      const { title, description, type } = this.formatAuditLogActivity(log.action, log.resource ?? undefined, log.details);
+
+      return {
+        id: log.id,
+        type: type,
+        title: title,
+        description: description,
+        performedBy: this.getPerformerFromDetails(log.details) || 'System',
+        timestamp: log.createdAt,
+        ipAddress: log.ipAddress,
+        userAgent: log.userAgent,
+        rawAction: log.action,
+        rawResource: log.resource
+      };
+    });
+
+    return {
+      data: activities,
+      meta: {
+        total: auditLogs.length,
+        days: days,
+        action: action || null,
+        requestedBy: requestedBy
+      }
+    };
+  }
+
+  /**
+   * Format audit log entry into human-readable activity
+   */
+  private formatAuditLogActivity(action: string, resource?: string, details?: any) {
+    const actionMap = {
+      'LOGIN': {
+        type: 'LOGIN',
+        title: 'User Login',
+        description: 'Successful login to the system'
+      },
+      'LOGOUT': {
+        type: 'LOGOUT',
+        title: 'User Logout',
+        description: 'User logged out from the system'
+      },
+      'USER_CREATED': {
+        type: 'PROFILE_UPDATED',
+        title: 'Account Created',
+        description: 'User account was created'
+      },
+      'USER_UPDATED': {
+        type: 'PROFILE_UPDATED',
+        title: 'Profile Updated',
+        description: 'User profile information was updated'
+      },
+      'USER_STATUS_CHANGED': {
+        type: 'PROFILE_UPDATED',
+        title: 'Account Status Changed',
+        description: 'User account status was modified'
+      },
+      'USER_VERIFICATION_CHANGED': {
+        type: 'PROFILE_UPDATED',
+        title: 'Verification Status Changed',
+        description: 'Email verification status was updated'
+      },
+      'USER_PASSWORD_RESET': {
+        type: 'PASSWORD_CHANGED',
+        title: 'Password Reset',
+        description: 'User password was reset by administrator'
+      },
+      'USER_ROLES_ASSIGNED': {
+        type: 'ROLE_ASSIGNED',
+        title: 'Role Assigned',
+        description: 'New role was assigned to user'
+      },
+      'USER_ROLES_REVOKED': {
+        type: 'ROLE_REMOVED',
+        title: 'Role Revoked',
+        description: 'Role was removed from user'
+      },
+      'USER_DETAILS_ACCESSED': {
+        type: 'LOGIN',
+        title: 'Profile Accessed',
+        description: 'User details were viewed'
+      }
+    };
+
+    const mapping = actionMap[action as keyof typeof actionMap] || {
+      type: 'LOGIN',
+      title: action.replace(/_/g, ' ').toLowerCase(),
+      description: `${action.replace(/_/g, ' ').toLowerCase()} action performed`
+    };
+
+    // Enhance description with details if available
+    if (details && typeof details === 'object') {
+      if (details.roleName) {
+        mapping.description = `${mapping.description}: ${details.roleName}`;
+      } else if (details.targetUserId) {
+        mapping.description = `${mapping.description} for user ${details.targetUserId}`;
+      }
+    }
+
+    return mapping;
+  }
+
+  /**
+   * Extract performer information from audit details
+   */
+  private getPerformerFromDetails(details?: any): string | null {
+    if (!details || typeof details !== 'object') return null;
+
+    // Check for various performer identifiers
+    if (details.performedBy) return details.performedBy;
+    if (details.assignedBy) return `Admin (${details.assignedBy})`;
+    if (details.revokedBy) return `Admin (${details.revokedBy})`;
+    if (details.updatedBy) return `Admin (${details.updatedBy})`;
+
+    return null;
   }
 }

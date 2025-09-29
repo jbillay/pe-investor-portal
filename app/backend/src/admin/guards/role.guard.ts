@@ -28,6 +28,24 @@ export class RoleGuard implements CanActivate {
     private permissionService: PermissionService,
   ) {}
 
+  /**
+   * Normalize permission name for comparison
+   * Converts both "USER:MANAGE_ROLES" and "USER_MANAGE_ROLES" to the same format
+   */
+  private normalizePermission(permission: string): string {
+    return permission.replace(/:/g, '_').toUpperCase();
+  }
+
+  /**
+   * Check if user has the required permission, handling format differences
+   */
+  private hasPermission(userPermissions: string[], requiredPermission: string): boolean {
+    const normalizedRequired = this.normalizePermission(requiredPermission);
+    return userPermissions.some(userPerm =>
+      this.normalizePermission(userPerm) === normalizedRequired
+    );
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Check if route is public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -124,7 +142,7 @@ export class RoleGuard implements CanActivate {
       // Check required permissions (ALL must be present)
       if (requiredPermissions?.length) {
         const hasAllPermissions = requiredPermissions.every(permission =>
-          userPermissions.includes(permission)
+          this.hasPermission(userPermissions, permission)
         );
 
         if (!hasAllPermissions) {
@@ -140,7 +158,7 @@ export class RoleGuard implements CanActivate {
       // Check required any permission (at least ONE must be present)
       if (requiredAnyPermission?.length) {
         const hasAnyPermission = requiredAnyPermission.some(permission =>
-          userPermissions.includes(permission)
+          this.hasPermission(userPermissions, permission)
         );
 
         if (!hasAnyPermission) {
