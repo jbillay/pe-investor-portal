@@ -49,22 +49,22 @@
         <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div class="col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Search Events</label>
-            <div class="p-inputgroup">
-              <span class="p-inputgroup-addon">
+            <InputGroup>
+              <InputGroupAddon>
                 <i class="pi pi-search"></i>
-              </span>
+              </InputGroupAddon>
               <InputText
                 v-model="filters.search"
                 placeholder="Search by user, action, or description..."
                 class="flex-1"
                 aria-label="Search audit events by user, action, or description"
               />
-            </div>
+            </InputGroup>
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Action</label>
-            <Dropdown
+            <Select
               v-model="filters.action"
               :options="filterOptions.actions"
               optionLabel="label"
@@ -78,7 +78,7 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Resource</label>
-            <Dropdown
+            <Select
               v-model="filters.resource"
               :options="filterOptions.resources"
               optionLabel="label"
@@ -92,7 +92,7 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
-            <Dropdown
+            <Select
               :model-value="dateRangeOptions.find(opt => opt.value === filters.days)"
               :options="dateRangeOptions"
               optionLabel="label"
@@ -127,7 +127,7 @@
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">User</label>
-              <Dropdown
+              <Select
                 v-model="filters.userId"
                 :options="userOptions"
                 optionLabel="label"
@@ -141,7 +141,7 @@
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Resource</label>
-              <Dropdown
+              <Select
                 v-model="filters.resource"
                 :options="filterOptions.resources"
                 optionLabel="label"
@@ -511,6 +511,7 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (..
 }
 
 import Dialog from 'primevue/dialog';
+import Select from 'primevue/select';
 
 // Props
 const props = defineProps<{

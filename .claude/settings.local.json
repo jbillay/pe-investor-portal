@@ -38,7 +38,13 @@
       "Bash(npx vue-tsc:*)",
       "Bash(npx prisma generate:*)",
       "mcp__playwright__browser_console_messages",
-      "mcp__playwright__browser_tabs"
+      "mcp__playwright__browser_tabs",
+      "Bash(curl:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:primevue.org)",
+      "WebSearch",
+      "Bash(timeout:*)",
+      "Bash(tasklist)"
     ],
     "deny": [],
     "ask": []

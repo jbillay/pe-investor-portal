@@ -17,7 +17,7 @@ Core functions should include
 
 ### Frontend Stack
 - **Framework**: Vue.js 3 with Composition API
-- **UI Framework**: PrimeVue components
+- **UI Framework**: PrimeVue v4 components
 - **Styling**: Tailwind CSS (utility-first, following Stripe's approach)
 - **State Management**: Pinia for reactive state management
 - **Type Safety**: TypeScript throughout
@@ -425,3 +425,4 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 - [OWASP Security Guidelines](https://owasp.org/)
 
 This guide should be referenced for all development decisions and code assistance to maintain consistency and quality across the project. Update this document as patterns evolve and new decisions are made.
+- Don't start frontend or backend services, they are currently running, frontend on port 3000 and backend on port 5173

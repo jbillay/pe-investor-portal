@@ -140,7 +140,7 @@ export class UserController {
     status: 403,
     description: 'Forbidden - Insufficient permissions'
   })
-  @RequirePermissions('USER_READ')
+  @RequirePermissions('USER:READ')
   @RequireAnyRole('SUPER_ADMIN', 'FUND_MANAGER', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_LIST_ACCESSED')
   async findAll(
@@ -176,7 +176,7 @@ export class UserController {
     description: 'Successfully retrieved user statistics',
     type: UserStatsResponseDto
   })
-  @RequirePermissions('ANALYTICS_READ')
+  @RequirePermissions('USER:READ')
   @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_STATS_ACCESSED')
   async getStats(
@@ -221,7 +221,7 @@ export class UserController {
     status: 404,
     description: 'User not found'
   })
-  @RequirePermissions('USER_READ')
+  @RequirePermissions('USER:READ')
   @AuditLog('USER_DETAILS_ACCESSED')
   async findOne(
     @Param('id', ParseCuidPipe) id: string,
@@ -267,8 +267,8 @@ export class UserController {
     description: 'User with email already exists'
   })
   @HttpCode(HttpStatus.CREATED)
-  @RequirePermissions('USER_CREATE')
-  @RequireAnyRole('SUPER_ADMIN', 'FUND_MANAGER')
+  @RequirePermissions('USER:CREATE')
+  @RequireAnyRole('SUPER_ADMIN')
   @RateLimit({ limit: 10, window: 300 }) // 10 requests per 5 minutes
   @AuditLog('USER_CREATED')
   async create(
@@ -319,7 +319,7 @@ export class UserController {
     status: 409,
     description: 'Email already exists or concurrent update conflict'
   })
-  @RequirePermissions('USER_UPDATE')
+  @RequirePermissions('USER:UPDATE')
   @AuditLog('USER_UPDATED')
   async update(
     @Param('id', ParseCuidPipe) id: string,
@@ -369,7 +369,7 @@ export class UserController {
     status: 404,
     description: 'User not found'
   })
-  @RequirePermissions('USER_UPDATE')
+  @RequirePermissions('USER:UPDATE')
   @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_STATUS_CHANGED')
   async updateStatus(
@@ -411,7 +411,7 @@ export class UserController {
     description: 'User verification status successfully updated',
     type: UserResponseDto
   })
-  @RequirePermissions('USER_UPDATE')
+  @RequirePermissions('USER:UPDATE')
   @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_VERIFICATION_CHANGED')
   async updateVerification(
@@ -501,7 +501,7 @@ export class UserController {
     status: 200,
     description: 'Successfully retrieved user roles'
   })
-  @RequirePermissions('USER_READ')
+  @RequirePermissions('USER:READ')
   @AuditLog('USER_ROLES_ACCESSED')
   async getUserRoles(
     @Param('id', ParseCuidPipe) id: string,
@@ -688,7 +688,7 @@ export class UserController {
     status: 404,
     description: 'User not found'
   })
-  @RequirePermissions('USER_DELETE')
+  @RequirePermissions('USER:DELETE')
   @RequireRoles('SUPER_ADMIN')
   @AuditLog('USER_DELETED')
   async remove(
@@ -725,7 +725,7 @@ export class UserController {
     status: 200,
     description: 'Export file generated successfully'
   })
-  @RequirePermissions('DATA_EXPORT')
+  @RequirePermissions('USER:EXPORT')
   @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @RateLimit({ limit: 2, window: 3600 }) // 2 exports per hour
   @AuditLog('USER_DATA_EXPORTED')
@@ -793,7 +793,7 @@ export class UserController {
     status: 404,
     description: 'User not found'
   })
-  @RequirePermissions('USER_READ')
+  @RequirePermissions('USER:READ')
   @RequireAnyRole('SUPER_ADMIN', 'COMPLIANCE_OFFICER')
   @AuditLog('USER_AUDIT_ACCESSED')
   async getUserAuditLogs(

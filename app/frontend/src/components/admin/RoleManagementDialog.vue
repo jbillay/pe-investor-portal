@@ -162,16 +162,16 @@
 
         <!-- Role Search and Filter -->
         <div class="mb-4">
-          <div class="p-inputgroup">
-            <span class="p-inputgroup-addon">
+          <InputGroup>
+            <InputGroupAddon>
               <i class="pi pi-search"></i>
-            </span>
+            </InputGroupAddon>
             <InputText
               v-model="roleSearchTerm"
               placeholder="Search available roles..."
               class="flex-1"
             />
-          </div>
+          </InputGroup>
         </div>
 
         <!-- Loading State -->
@@ -347,7 +347,7 @@
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Assignment Duration
               </label>
-              <Dropdown
+              <Select
                 v-model="assignmentDuration"
                 :options="durationOptions"
                 optionLabel="label"
@@ -558,7 +558,7 @@ import type { RoleResponseDto } from '@/types/admin';
 
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
+import Select from 'primevue/select';
 import Tag from 'primevue/tag';
 import Textarea from 'primevue/textarea';
 import Calendar from 'primevue/calendar';

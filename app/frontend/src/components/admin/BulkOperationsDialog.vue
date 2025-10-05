@@ -120,7 +120,7 @@
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Select Role <span class="text-red-500">*</span>
               </label>
-              <Dropdown
+              <Select
                 v-model="bulkConfig.roleId"
                 :options="availableRoles"
                 optionLabel="name"
@@ -132,7 +132,7 @@
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Assignment Duration</label>
-              <Dropdown
+              <Select
                 v-model="bulkConfig.duration"
                 :options="durationOptions"
                 optionLabel="label"
@@ -163,7 +163,7 @@
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 New Status <span class="text-red-500">*</span>
               </label>
-              <Dropdown
+              <Select
                 v-model="bulkConfig.status"
                 :options="statusOptions"
                 optionLabel="label"
@@ -224,7 +224,7 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
-              <Dropdown
+              <Select
                 v-model="bulkConfig.exportFormat"
                 :options="exportFormatOptions"
                 optionLabel="label"
@@ -339,6 +339,7 @@ import { useToast } from 'primevue/usetoast';
 import Textarea from 'primevue/textarea';
 import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
+import Select from 'primevue/select';
 
 // Props
 const props = defineProps<{

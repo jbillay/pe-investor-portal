@@ -102,15 +102,6 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  console.log('Navigation guard triggered:', {
-    to: to.path,
-    from: from.path,
-    requiresAuth: to.meta.requiresAuth !== false,
-    isAuthenticated: authStore.isAuthenticated,
-    hasUser: !!authStore.user,
-    hasToken: !!authStore.accessToken
-  })
-
   // Set page title
   if (to.meta.title) {
     document.title = `${to.meta.title} - PE Investor Portal`
@@ -125,15 +116,9 @@ router.beforeEach(async (to, from, next) => {
       console.log('Has token but no user, fetching current user...')
       try {
         await authStore.getCurrentUser()
-        console.log('Successfully fetched current user, auth state:', {
-          isAuthenticated: authStore.isAuthenticated,
-          hasUser: !!authStore.user,
-          userEmail: authStore.user?.email
-        })
       } catch (error) {
         // If getting user fails, redirect to login
         console.error('Failed to get current user:', error)
-        console.log('Clearing auth state and redirecting to login')
         authStore.logout()
         next({
           name: 'login',
@@ -145,7 +130,6 @@ router.beforeEach(async (to, from, next) => {
 
     // Check if user is authenticated
     if (!authStore.isAuthenticated) {
-      console.log('User not authenticated, redirecting to login')
       next({
         name: 'login',
         query: { redirect: to.fullPath }
@@ -171,7 +155,6 @@ router.beforeEach(async (to, from, next) => {
   } else {
     // If user is authenticated and trying to access login page, redirect to dashboard
     if (authStore.isAuthenticated && to.name === 'login') {
-      console.log('Authenticated user accessing login, redirecting to dashboard')
       next({ name: 'dashboard' })
       return
     }

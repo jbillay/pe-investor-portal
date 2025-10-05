@@ -14,7 +14,7 @@
         </div>
         <div class="status-filter">
           <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <Dropdown
+          <Select
             v-model="filters.status"
             :options="statusOptions"
             optionLabel="label"
@@ -26,7 +26,7 @@
         </div>
         <div class="type-filter">
           <label class="block text-sm font-medium text-gray-700 mb-1">Role Type</label>
-          <Dropdown
+          <Select
             v-model="filters.type"
             :options="roleTypeOptions"
             optionLabel="label"
@@ -49,14 +49,11 @@
 
     <!-- Roles Data Table -->
     <DataTable
-      v-model:selection="selectedRoles"
       :value="filteredRoles"
-      selectionMode="multiple"
       :paginator="true"
       :rows="15"
-      :loading="loading"
+      :loading="rolesLoading"
       responsiveLayout="scroll"
-      :metaKeySelection="false"
       dataKey="id"
       :rowClass="getRowClass"
       class="role-datatable"
@@ -69,19 +66,8 @@
           <span class="text-lg font-medium text-gray-900">
             {{ filteredRoles.length }} roles found
           </span>
-          <div class="flex gap-2">
-            <Button
-              v-if="selectedRoles.length > 0"
-              :label="`Bulk Actions (${selectedRoles.length})`"
-              icon="pi pi-cog"
-              class="p-button-sm p-button-outlined"
-              @click="showBulkActionsMenu = !showBulkActionsMenu"
-            />
-          </div>
         </div>
       </template>
-
-      <Column selectionMode="multiple" headerStyle="width: 3rem" />
 
       <!-- Role Name and Details -->
       <Column field="name" :sortable="true" class="min-w-48">
@@ -212,15 +198,9 @@
               :disabled="data.isSystemRole"
             />
             <Button
-              icon="pi pi-users"
-              class="p-button-sm p-button-text p-button-rounded"
-              @click="manageRoleUsers(data)"
-              v-tooltip.top="'Manage Users'"
-            />
-            <Button
               icon="pi pi-shield"
               class="p-button-sm p-button-text p-button-rounded"
-              @click="$emit('assign-permissions', data)"
+              @click="assignPermissionsToRole(data)"
               v-tooltip.top="'Manage Permissions'"
             />
             <Button
@@ -243,7 +223,7 @@
             label="Create Role"
             icon="pi pi-plus"
             class="p-button-primary"
-            @click="openCreateRoleDialog"
+            @click="emit('create-role')"
           />
         </div>
       </template>
@@ -315,196 +295,94 @@
       </Card>
     </div>
 
-    <!-- Bulk Actions Menu Overlay -->
-    <OverlayPanel ref="bulkActionsMenu" v-model:visible="showBulkActionsMenu">
-      <div class="flex flex-col gap-2 min-w-48">
-        <Button
-          label="Activate Selected"
-          icon="pi pi-check"
-          class="p-button-text p-button-sm justify-start"
-          @click="bulkActivateRoles"
-        />
-        <Button
-          label="Deactivate Selected"
-          icon="pi pi-times"
-          class="p-button-text p-button-sm justify-start"
-          @click="bulkDeactivateRoles"
-        />
-        <Divider />
-        <Button
-          label="Export Selected"
-          icon="pi pi-download"
-          class="p-button-text p-button-sm justify-start"
-          @click="exportSelectedRoles"
-        />
-        <Button
-          label="Duplicate Selected"
-          icon="pi pi-copy"
-          class="p-button-text p-button-sm justify-start"
-          @click="duplicateSelectedRoles"
-        />
-      </div>
-    </OverlayPanel>
+    <!-- Role Details Dialog -->
+    <RoleDetailsDialog
+      v-model:visible="roleDetailsDialogVisible"
+      :role="selectedRoleForDetails"
+    />
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
+import RoleDetailsDialog from './RoleDetailsDialog.vue';
+import { useRoles } from '@/composables/useRoles';
+import type { Role } from '@/types/role';
 
-// Props
+/**
+ * RoleManagementPanel Component
+ * Enterprise-grade role management with real-time API integration
+ * Follows Vue.js 3 Composition API best practices
+ */
+
+// Props - kept for backward compatibility, but loading now comes from composable
 defineProps<{
   loading?: boolean;
 }>();
 
-// Emits
+// Emits - enhanced with proper typing
 const emit = defineEmits<{
-  'edit-role': [role: any];
+  'edit-role': [role: Role];
   'create-role': [];
-  'assign-permissions': [role: any];
+  'assign-permissions': [role: Role];
+  'role-updated': [role: Role];
+  'role-deleted': [roleId: string];
 }>();
 
 // Composables
 const toast = useToast();
 const confirm = useConfirm();
 
-// State
-const selectedRoles = ref([]);
-const showBulkActionsMenu = ref(false);
-// Removed duplicate loading ref
+// Local state for Role Details Dialog
+const roleDetailsDialogVisible = ref(false);
+const selectedRoleForDetails = ref<Role | null>(null);
 
-// Filters
-const filters = ref({
-  search: '',
-  status: null,
-  type: null,
-});
+// Role management composable - provides all state and actions
+const {
+  // State
+  roles,
+  loading: rolesLoading,
+  error,
 
-// Mock data - replace with actual API calls
-const roles = ref([
-  {
-    id: '1',
-    name: 'SUPER_ADMIN',
-    description: 'System administrators with full access to all features',
-    status: 'ACTIVE',
-    isDefault: false,
-    isSystemRole: true,
-    userCount: 2,
-    permissionCount: 48,
-    createdAt: new Date('2024-01-15'),
-  },
-  {
-    id: '2',
-    name: 'FUND_MANAGER',
-    description: 'Fund management team with operational access',
-    status: 'ACTIVE',
-    isDefault: false,
-    isSystemRole: true,
-    userCount: 8,
-    permissionCount: 35,
-    createdAt: new Date('2024-01-15'),
-  },
-  {
-    id: '3',
-    name: 'COMPLIANCE_OFFICER',
-    description: 'Compliance and regulatory oversight',
-    status: 'ACTIVE',
-    isDefault: false,
-    isSystemRole: true,
-    userCount: 3,
-    permissionCount: 28,
-    createdAt: new Date('2024-01-15'),
-  },
-  {
-    id: '4',
-    name: 'ANALYST',
-    description: 'Read-only access for analysis and reporting',
-    status: 'ACTIVE',
-    isDefault: false,
-    isSystemRole: true,
-    userCount: 12,
-    permissionCount: 18,
-    createdAt: new Date('2024-01-15'),
-  },
-  {
-    id: '5',
-    name: 'INVESTOR',
-    description: 'Limited partners with access to their investments',
-    status: 'ACTIVE',
-    isDefault: true,
-    isSystemRole: true,
-    userCount: 145,
-    permissionCount: 12,
-    createdAt: new Date('2024-01-15'),
-  },
-  {
-    id: '6',
-    name: 'VIEWER',
-    description: 'Minimum access for basic information',
-    status: 'ACTIVE',
-    isDefault: false,
-    isSystemRole: true,
-    userCount: 8,
-    permissionCount: 6,
-    createdAt: new Date('2024-01-15'),
-  },
-]);
+  // Computed
+  filteredRoles,
+  totalRoles,
+  activeRoles,
+  averagePermissions,
 
-// Filter options
+  // Filters
+  filters,
+  clearFilters,
+
+  // Actions
+  fetchRoles,
+  deleteRole,
+} = useRoles();
+
+// Filter options for dropdowns
 const statusOptions = [
   { label: 'Active', value: 'ACTIVE' },
   { label: 'Inactive', value: 'INACTIVE' },
-  { label: 'Deprecated', value: 'DEPRECATED' },
 ];
 
 const roleTypeOptions = [
-  { label: 'System Role', value: 'SYSTEM' },
-  { label: 'Custom Role', value: 'CUSTOM' },
+  { label: 'System Roles', value: 'SYSTEM' },
+  { label: 'Default Roles', value: 'DEFAULT' },
+  { label: 'Custom Roles', value: 'CUSTOM' },
 ];
 
-// Computed properties
-const filteredRoles = computed(() => {
-  let filtered = roles.value;
+// Local computed properties for dashboard stats
+const customRoles = computed(() => roles.value.filter(r => !r.isSystemRole && !r.isDefault).length);
 
-  if (filters.value.search) {
-    const search = filters.value.search.toLowerCase();
-    filtered = filtered.filter(role =>
-      role.name.toLowerCase().includes(search) ||
-      role.description?.toLowerCase().includes(search)
-    );
-  }
+/**
+ * Component Methods
+ * All role-related operations now use the composable
+ */
 
-  if (filters.value.status) {
-    filtered = filtered.filter(role => role.status === filters.value.status);
-  }
-
-  if (filters.value.type) {
-    const isSystemRole = filters.value.type === 'SYSTEM';
-    filtered = filtered.filter(role => role.isSystemRole === isSystemRole);
-  }
-
-  return filtered;
-});
-
-const totalRoles = computed(() => roles.value.length);
-const activeRoles = computed(() => roles.value.filter(r => r.status === 'ACTIVE').length);
-const customRoles = computed(() => roles.value.filter(r => !r.isSystemRole).length);
-const averagePermissions = computed(() => {
-  const total = roles.value.reduce((sum, role) => sum + (role.permissionCount || 0), 0);
-  return Math.round(total / roles.value.length) || 0;
-});
-
-// Methods
-const clearFilters = () => {
-  filters.value = {
-    search: '',
-    status: null,
-    type: null,
-  };
-};
-
-const getRowClass = (data: any) => {
+const getRowClass = (data: Role) => {
   if (data.status === 'INACTIVE') return 'opacity-60';
   if (data.isDefault) return 'bg-blue-50';
   return '';
@@ -550,136 +428,65 @@ const formatTime = (date: Date) => {
   }).format(new Date(date));
 };
 
-const openCreateRoleDialog = () => {
-  emit('create-role');
-};
-
-const viewRole = (role: any) => {
-  // Implement role details view
-  console.log('View role:', role);
-};
-
-const editRole = (role: any) => {
-  emit('edit-role', role);
-};
-
-const manageRoleUsers = (role: any) => {
-  // Implement user management for role
-  console.log('Manage users for role:', role);
-};
-
-const confirmDeleteRole = (role: any) => {
+/**
+ * Role deletion with confirmation dialog
+ * Uses the API service through the composable
+ */
+const confirmDeleteRole = (role: Role) => {
   confirm.require({
     message: `Are you sure you want to delete the role "${role.name}"? This action cannot be undone.`,
     header: 'Delete Role',
     icon: 'pi pi-exclamation-triangle',
     acceptClass: 'p-button-danger',
-    accept: () => {
-      deleteRole(role);
+    accept: async () => {
+      const success = await deleteRole(role.id);
+      if (success) {
+        emit('role-deleted', role.id);
+      }
     }
   });
 };
 
-const deleteRole = async (role: any) => {
-  try {
-    // API call to delete role
-    const index = roles.value.findIndex(r => r.id === role.id);
-    if (index !== -1) {
-      roles.value.splice(index, 1);
-    }
 
-    toast.add({
-      severity: 'success',
-      summary: 'Role Deleted',
-      detail: `Role "${role.name}" has been successfully deleted.`,
-      life: 4000
-    });
-  } catch (_) {
-    toast.add({
-      severity: 'error',
-      summary: 'Delete Failed',
-      detail: 'Failed to delete the role. Please try again.',
-      life: 4000
-    });
+/**
+ * Enhanced role management methods
+ */
+const viewRole = (role: Role) => {
+  selectedRoleForDetails.value = role;
+  roleDetailsDialogVisible.value = true;
+};
+
+const editRole = (role: Role) => {
+  emit('edit-role', role);
+};
+
+const assignPermissionsToRole = (role: Role) => {
+  emit('assign-permissions', role);
+};
+
+/**
+ * Component lifecycle
+ * Load initial data and set up watchers
+ */
+onMounted(async () => {
+  // Load roles data on component mount
+  await fetchRoles(true);
+});
+
+// Watch for error state and display notifications
+watch(error, (newError) => {
+  if (newError) {
+    // Error is already handled by the composable with toast notifications
+    // This watcher can be used for additional error handling if needed
+    console.error('Role management error:', newError);
   }
-};
+});
 
-
-const bulkActivateRoles = async () => {
-  try {
-    selectedRoles.value.forEach((role: any) => {
-      role.status = 'ACTIVE';
-    });
-
-    toast.add({
-      severity: 'success',
-      summary: 'Roles Activated',
-      detail: `${selectedRoles.value.length} roles have been activated.`,
-      life: 4000
-    });
-
-    selectedRoles.value = [];
-    showBulkActionsMenu.value = false;
-  } catch (_) {
-    toast.add({
-      severity: 'error',
-      summary: 'Activation Failed',
-      detail: 'Failed to activate roles. Please try again.',
-      life: 4000
-    });
-  }
-};
-
-const bulkDeactivateRoles = async () => {
-  try {
-    selectedRoles.value.forEach((role: any) => {
-      role.status = 'INACTIVE';
-    });
-
-    toast.add({
-      severity: 'success',
-      summary: 'Roles Deactivated',
-      detail: `${selectedRoles.value.length} roles have been deactivated.`,
-      life: 4000
-    });
-
-    selectedRoles.value = [];
-    showBulkActionsMenu.value = false;
-  } catch (_) {
-    toast.add({
-      severity: 'error',
-      summary: 'Deactivation Failed',
-      detail: 'Failed to deactivate roles. Please try again.',
-      life: 4000
-    });
-  }
-};
-
-const exportSelectedRoles = () => {
-  toast.add({
-    severity: 'info',
-    summary: 'Export Started',
-    detail: `Exporting ${selectedRoles.value.length} selected roles.`,
-    life: 3000
-  });
-  selectedRoles.value = [];
-  showBulkActionsMenu.value = false;
-};
-
-const duplicateSelectedRoles = () => {
-  toast.add({
-    severity: 'info',
-    summary: 'Duplication Started',
-    detail: `Creating copies of ${selectedRoles.value.length} selected roles.`,
-    life: 3000
-  });
-  selectedRoles.value = [];
-  showBulkActionsMenu.value = false;
-};
-
-// Lifecycle
-onMounted(() => {
-  // Load roles data
+/**
+ * Expose methods for parent components
+ */
+defineExpose({
+  refreshRoles: fetchRoles
 });
 </script>
 

@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'
+import Aura from '@primevue/themes/aura'
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
 import Tooltip from 'primevue/tooltip'
@@ -8,9 +9,11 @@ import Tooltip from 'primevue/tooltip'
 // PrimeVue Components
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import InputGroup from 'primevue/inputgroup'
+import InputGroupAddon from 'primevue/inputgroupaddon'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
@@ -28,8 +31,6 @@ import ConfirmDialog from 'primevue/confirmdialog'
 import App from './App.vue'
 import router from './router'
 
-import 'primevue/resources/themes/lara-light-blue/theme.css'
-import 'primevue/resources/primevue.min.css'
 import 'primeicons/primeicons.css'
 import './assets/main.css'
 
@@ -37,16 +38,27 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
-app.use(PrimeVue)
+app.use(PrimeVue, {
+  theme: {
+    preset: Aura,
+    options: {
+      prefix: 'p',
+      darkModeSelector: '.dark',
+      cssLayer: false
+    }
+  }
+})
 app.use(ToastService)
 app.use(ConfirmationService)
 
 // Register PrimeVue components globally
 app.component('Button', Button)
 app.component('InputText', InputText)
+app.component('InputGroup', InputGroup)
+app.component('InputGroupAddon', InputGroupAddon)
 app.component('DataTable', DataTable)
 app.component('Column', Column)
-app.component('Dropdown', Dropdown)
+app.component('Select', Select)
 app.component('MultiSelect', MultiSelect)
 app.component('Card', Card)
 app.component('Tag', Tag)

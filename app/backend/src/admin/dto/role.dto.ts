@@ -3,7 +3,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsBoolean,
-  IsUUID,
   IsArray,
   ValidateNested,
   IsEnum,
@@ -55,7 +54,6 @@ export class UpdateRoleDto extends PartialType(CreateRoleDto) {
     description: 'Role ID',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsOptional()
   id?: string;
 }
@@ -66,7 +64,6 @@ export class AssignRoleDto {
     description: 'User ID to assign role to',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   userId: string;
 
@@ -74,7 +71,6 @@ export class AssignRoleDto {
     description: 'Role ID to assign',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   roleId: string;
 
@@ -101,7 +97,6 @@ export class RevokeRoleDto {
     description: 'User ID to revoke role from',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   userId: string;
 
@@ -109,7 +104,6 @@ export class RevokeRoleDto {
     description: 'Role ID to revoke',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   roleId: string;
 
@@ -130,7 +124,6 @@ export class BulkAssignRolesDto {
     type: [String],
   })
   @IsArray()
-  @IsUUID('4', { each: true })
   @ArrayMinSize(1)
   userIds: string[];
 
@@ -138,7 +131,6 @@ export class BulkAssignRolesDto {
     description: 'Role ID to assign to all users',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   roleId: string;
 

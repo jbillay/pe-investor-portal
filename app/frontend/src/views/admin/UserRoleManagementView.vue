@@ -140,6 +140,7 @@
               />
               <RoleManagementPanel
                 v-else-if="activeSection === 'roles'"
+                ref="roleManagementPanelComponent"
                 @edit-role="editRole"
                 @create-role="createRole"
                 @assign-permissions="showPermissionDialog"
@@ -198,6 +199,16 @@
       @permissions-updated="handlePermissionsUpdated"
     />
 
+    <!-- Role Form Dialog (Create/Edit) -->
+    <RoleFormDialog
+      v-model:visible="roleFormDialogVisible"
+      :role="selectedRoleForEdit"
+      :existing-roles="[]"
+      @role-created="handleRoleCreated"
+      @role-updated="handleRoleUpdated"
+      @role-deleted="handleRoleDeleted"
+    />
+
     <!-- Audit Trail Dialog -->
     <AuditTrailDialog
       v-model:visible="showAuditDialog"
@@ -233,6 +244,7 @@ import BulkOperationsDialog from '@/components/admin/BulkOperationsDialog.vue';
 import PermissionManagementDialog from '@/components/admin/PermissionManagementDialog.vue';
 import AuditTrailDialog from '@/components/admin/AuditTrailDialog.vue';
 import UserEditDialog from '@/components/admin/UserEditDialog.vue';
+import RoleFormDialog from '@/components/admin/RoleFormDialog.vue';
 
 interface UserWithRoles {
   id: string;
@@ -261,6 +273,7 @@ const selectedUsers = ref([]);
 const selectedUser = ref(null);
 const selectedRole = ref(null);
 const userManagementPanelComponent = ref(null);
+const roleManagementPanelComponent = ref(null);
 
 // Dialog visibility
 const showInviteDialog = ref(false);
@@ -269,6 +282,8 @@ const showBulkDialog = ref(false);
 const permissionDialogVisible = ref(false);
 const showAuditDialog = ref(false);
 const userEditVisible = ref(false);
+const roleFormDialogVisible = ref(false);
+const selectedRoleForEdit = ref(null);
 
 // Breadcrumb
 const breadcrumbItems = ref([
@@ -407,13 +422,13 @@ const showRoleManagementDialog = (user: UserWithRoles) => {
 };
 
 const editRole = (role: any) => {
-  selectedRole.value = role;
-  permissionDialogVisible.value = true;
+  selectedRoleForEdit.value = role;
+  roleFormDialogVisible.value = true;
 };
 
 const createRole = () => {
-  selectedRole.value = null;
-  permissionDialogVisible.value = true;
+  selectedRoleForEdit.value = null;
+  roleFormDialogVisible.value = true;
 };
 
 const showPermissionDialog = (role: any) => {
@@ -499,6 +514,54 @@ const handlePermissionsUpdated = (result: any) => {
 
   permissionDialogVisible.value = false;
   selectedRole.value = null;
+};
+
+const handleRoleCreated = async (role: any) => {
+  toast.add({
+    severity: 'success',
+    summary: 'Role Created',
+    detail: `Role "${role.name}" has been created successfully`,
+    life: 3000
+  });
+  roleFormDialogVisible.value = false;
+  selectedRoleForEdit.value = null;
+
+  // Refresh the role list in the panel
+  if (roleManagementPanelComponent.value?.refreshRoles) {
+    await roleManagementPanelComponent.value.refreshRoles();
+  }
+};
+
+const handleRoleUpdated = async (role: any) => {
+  toast.add({
+    severity: 'success',
+    summary: 'Role Updated',
+    detail: `Role "${role.name}" has been updated successfully`,
+    life: 3000
+  });
+  roleFormDialogVisible.value = false;
+  selectedRoleForEdit.value = null;
+
+  // Refresh the role list in the panel
+  if (roleManagementPanelComponent.value?.refreshRoles) {
+    await roleManagementPanelComponent.value.refreshRoles();
+  }
+};
+
+const handleRoleDeleted = async (roleId: string) => {
+  toast.add({
+    severity: 'success',
+    summary: 'Role Deleted',
+    detail: 'Role has been deleted successfully',
+    life: 3000
+  });
+  roleFormDialogVisible.value = false;
+  selectedRoleForEdit.value = null;
+
+  // Refresh the role list in the panel
+  if (roleManagementPanelComponent.value?.refreshRoles) {
+    await roleManagementPanelComponent.value.refreshRoles();
+  }
 };
 
 const handleUserUpdated = (result: any) => {

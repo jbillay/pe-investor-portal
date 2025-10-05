@@ -111,7 +111,7 @@ export class RoleService {
       createdAt: role.createdAt,
       updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
-      permissions: role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
+      permissions: role.rolePermissions.map(rp => rp.permission.name),
     }));
   }
 
@@ -146,7 +146,7 @@ export class RoleService {
       createdAt: role.createdAt,
       updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
-      permissions: role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
+      permissions: role.rolePermissions.map(rp => rp.permission.name),
     };
   }
 
@@ -181,7 +181,7 @@ export class RoleService {
       createdAt: role.createdAt,
       updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
-      permissions: role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
+      permissions: role.rolePermissions.map(rp => rp.permission.name),
     };
   }
 
@@ -561,7 +561,7 @@ export class RoleService {
       ur.role.rolePermissions.forEach(rp => {
         if (rp.isActive && rp.permission.isActive) {
           // Convert permission format from ROLE:ACTION to ROLE_ACTION
-          const formattedPermission = rp.permission.name.replace(':', '_');
+          const formattedPermission = rp.permission.name;
           allPermissions.add(formattedPermission);
         }
       });
@@ -643,7 +643,7 @@ export class RoleService {
       createdAt: role.createdAt,
       updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
-      permissions: role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
+      permissions: role.rolePermissions.map(rp => rp.permission.name),
     };
   }
 
@@ -724,14 +724,14 @@ export class RoleService {
         isDefault: userRole.role.isDefault,
         createdAt: userRole.role.createdAt,
         updatedAt: userRole.role.updatedAt,
-        permissions: userRole.role.rolePermissions.map(rp => rp.permission.name.replace(':', '_')),
+        permissions: userRole.role.rolePermissions.map(rp => rp.permission.name),
       }));
 
       const allPermissions = new Set<string>();
       ur.user.userRoles.forEach(userRole => {
         userRole.role.rolePermissions.forEach(rp => {
           if (rp.isActive && rp.permission.isActive) {
-            allPermissions.add(rp.permission.name.replace(':', '_'));
+            allPermissions.add(rp.permission.name);
           }
         });
       });

@@ -4,7 +4,7 @@
     :modal="true"
     :draggable="false"
     :closable="true"
-    :style="{ width: '90vw', maxWidth: '1000px', height: '90vh' }"
+    :style="{ width: '90vw', maxWidth: '1200px', height: '90vh' }"
     class="user-edit-dialog"
     @show="onDialogShow"
     @hide="onDialogHide"
@@ -35,9 +35,15 @@
       </div>
 
       <!-- Tab Navigation -->
-      <TabView v-else v-model:activeIndex="activeTabIndex" class="user-edit-tabs">
-        <!-- Basic Information Tab -->
-        <TabPanel header="Basic Information">
+      <Tabs v-else v-model:value="activeTabValue" class="user-edit-tabs">
+        <TabList>
+          <Tab value="0">Basic Information</Tab>
+          <Tab value="1">Activity Log</Tab>
+          <Tab value="2" :disabled="true">Security</Tab>
+        </TabList>
+        <TabPanels>
+          <!-- Basic Information Tab -->
+          <TabPanel value="0">
           <div class="tab-content p-6">
             <!-- User Avatar Section -->
             <div class="avatar-section mb-6 text-center">
@@ -112,7 +118,7 @@
 
               <div class="form-field">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
-                <Dropdown
+                <Select
                   v-model="formData.timezone"
                   :options="timezoneOptions"
                   optionLabel="label"
@@ -124,7 +130,7 @@
 
               <div class="form-field">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Language</label>
-                <Dropdown
+                <Select
                   v-model="formData.language"
                   :options="languageOptions"
                   optionLabel="label"
@@ -142,14 +148,14 @@
                       <i class="pi pi-user text-blue-600"></i>
                       <span class="text-sm font-medium">Active Status</span>
                     </div>
-                    <InputSwitch v-model="formData.isActive" />
+                    <ToggleSwitch v-model="formData.isActive" />
                   </div>
                   <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                     <div class="flex items-center gap-2">
                       <i class="pi pi-shield text-green-600"></i>
                       <span class="text-sm font-medium">Verification Status</span>
                     </div>
-                    <InputSwitch v-model="formData.isVerified" />
+                    <ToggleSwitch v-model="formData.isVerified" />
                   </div>
                 </div>
               </div>
@@ -170,11 +176,11 @@
               </div>
             </div>
           </div>
-        </TabPanel>
+          </TabPanel>
 
 
-        <!-- Activity Log Tab -->
-        <TabPanel header="Activity Log">
+          <!-- Activity Log Tab -->
+          <TabPanel value="1">
           <div class="tab-content p-6">
             <div class="activity-header mb-4 flex items-center justify-between">
               <h4 class="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -184,7 +190,7 @@
               <div class="flex items-center gap-3">
                 <div class="flex items-center gap-2">
                   <label class="text-sm font-medium text-gray-700">Time Period:</label>
-                  <Dropdown
+                  <Select
                     v-model="selectedTimePeriod"
                     :options="timePeriodOptions"
                     optionLabel="label"
@@ -254,10 +260,10 @@
               </div>
             </div>
           </div>
-        </TabPanel>
+          </TabPanel>
 
-        <!-- Security Settings Tab -->
-        <TabPanel header="Security" :disabled="true">
+          <!-- Security Settings Tab -->
+          <TabPanel value="2">
           <div class="tab-content p-6">
             <!-- Under Development Message -->
             <div class="flex flex-col items-center justify-center h-64 text-center">
@@ -272,8 +278,9 @@
               </div>
             </div>
           </div>
-        </TabPanel>
-      </TabView>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </div>
 
     <template #footer>
@@ -321,14 +328,17 @@ import { useApi } from '@/composables/useApi';
 // PrimeVue Components
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
+import Select from 'primevue/select';
 import Checkbox from 'primevue/checkbox';
-import InputSwitch from 'primevue/inputswitch';
+import ToggleSwitch from 'primevue/toggleswitch';
 import Tag from 'primevue/tag';
 import Avatar from 'primevue/avatar';
 import Dialog from 'primevue/dialog';
+import Tabs from 'primevue/tabs';
+import TabList from 'primevue/tablist';
+import Tab from 'primevue/tab';
+import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
-import TabView from 'primevue/tabview';
 
 // Props
 const props = defineProps<{
@@ -348,7 +358,7 @@ const { api } = useApi();
 
 // State
 const dialogVisible = ref(props.visible);
-const activeTabIndex = ref(0);
+const activeTabValue = ref('0');
 const isSaving = ref(false);
 const isLoading = ref(false);
 const isLoadingAuditLogs = ref(false);

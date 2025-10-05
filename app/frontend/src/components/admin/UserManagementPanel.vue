@@ -14,7 +14,7 @@
             />
           </div>
 
-          <Dropdown
+          <Select
             v-model="selectedRoleFilter"
             :options="roleFilterOptions"
             optionLabel="label"
@@ -25,7 +25,7 @@
             @change="applyFilters"
           />
 
-          <Dropdown
+          <Select
             v-model="selectedStatusFilter"
             :options="statusFilterOptions"
             optionLabel="label"
@@ -327,7 +327,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
-import { FilterMatchMode } from 'primevue/api';
+import { FilterMatchMode } from '@primevue/core/api';
 import { useApi } from '@/composables/useApi';
 import type { PaginatedUsersResponseDto } from '@/types/admin';
 
@@ -336,7 +336,7 @@ import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
+import Select from 'primevue/select';
 import Tag from 'primevue/tag';
 import Avatar from 'primevue/avatar';
 import Dialog from 'primevue/dialog';

@@ -3,7 +3,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsBoolean,
-  IsUUID,
   IsArray,
   IsEnum,
   ArrayMinSize,
@@ -57,7 +56,6 @@ export class UpdatePermissionDto extends PartialType(CreatePermissionDto) {
     description: 'Permission ID',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsOptional()
   id?: string;
 }
@@ -68,7 +66,6 @@ export class AssignPermissionToRoleDto {
     description: 'Role ID to assign permission to',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   roleId: string;
 
@@ -76,7 +73,6 @@ export class AssignPermissionToRoleDto {
     description: 'Permission ID to assign',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   permissionId: string;
 }
@@ -87,7 +83,6 @@ export class RevokePermissionFromRoleDto {
     description: 'Role ID to revoke permission from',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   roleId: string;
 
@@ -95,7 +90,6 @@ export class RevokePermissionFromRoleDto {
     description: 'Permission ID to revoke',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   permissionId: string;
 }
@@ -106,7 +100,6 @@ export class BulkAssignPermissionsDto {
     description: 'Role ID to assign permissions to',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsNotEmpty()
   roleId: string;
 
@@ -116,7 +109,6 @@ export class BulkAssignPermissionsDto {
     type: [String],
   })
   @IsArray()
-  @IsUUID('4', { each: true })
   @ArrayMinSize(1)
   permissionIds: string[];
 }
@@ -231,7 +223,6 @@ export class CheckPermissionDto {
     description: 'Specific resource ID to check permission for',
     example: 'cljk0x5a10001qz6z9k8z9k8z',
   })
-  @IsUUID()
   @IsOptional()
   resourceId?: string;
 }

@@ -63,20 +63,20 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div class="col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Search Permissions</label>
-            <div class="p-inputgroup">
-              <span class="p-inputgroup-addon">
+            <InputGroup>
+              <InputGroupAddon>
                 <i class="pi pi-search"></i>
-              </span>
+              </InputGroupAddon>
               <InputText
                 v-model="searchTerm"
                 placeholder="Search by permission name or description..."
                 class="flex-1"
               />
-            </div>
+            </InputGroup>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Resource Filter</label>
-            <Dropdown
+            <Select
               v-model="selectedResource"
               :options="resourceOptions"
               optionLabel="label"
@@ -88,7 +88,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Status Filter</label>
-            <Dropdown
+            <Select
               v-model="statusFilter"
               :options="statusFilterOptions"
               optionLabel="label"
@@ -253,23 +253,23 @@
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-between">
-        <div class="text-sm text-gray-500">
-          <i class="pi pi-info-circle mr-1"></i>
+      <div class="flex w-full items-center justify-between px-6 py-4 bg-gray-50 border-t">
+        <div class="text-sm text-gray-500 flex items-center">
+          <i class="pi pi-info-circle mr-2 text-blue-500"></i>
           Changes will be applied immediately and cannot be undone
         </div>
-        <div class="flex gap-3">
+        <div class="flex items-center gap-3">
           <Button
             label="Cancel"
             icon="pi pi-times"
-            class="p-button-outlined"
+            class="p-button-outlined p-button-secondary px-6 py-2"
             @click="closeDialog"
             :disabled="isSaving"
           />
           <Button
             label="Save Permissions"
             icon="pi pi-save"
-            class="p-button-primary"
+            class="p-button-primary px-8 py-2 font-semibold text-white bg-blue-600 hover:bg-blue-700 border-blue-600 hover:border-blue-700"
             @click="savePermissions"
             :loading="isSaving"
             :disabled="!canSavePermissions"
@@ -287,6 +287,7 @@ import { useToast } from 'primevue/usetoast';
 import Textarea from 'primevue/textarea';
 import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
+import Select from 'primevue/select';
 
 // Props
 const props = defineProps<{
