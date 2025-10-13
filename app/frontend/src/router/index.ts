@@ -71,10 +71,41 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'admin',
-        name: 'admin',
-        component: () => import('@views/admin/UserRoleManagementView.vue'),
+        redirect: '/admin/users'
+      },
+      {
+        path: 'admin/users',
+        name: 'admin-users',
+        component: () => import('@views/admin/UserManagementView.vue'),
         meta: {
-          title: 'Administration',
+          title: 'User Management',
+          requiresRole: 'SUPER_ADMIN'
+        }
+      },
+      {
+        path: 'admin/roles',
+        name: 'admin-roles',
+        component: () => import('@views/admin/RoleManagementView.vue'),
+        meta: {
+          title: 'Role Management',
+          requiresRole: 'SUPER_ADMIN'
+        }
+      },
+      {
+        path: 'admin/analytics',
+        name: 'admin-analytics',
+        component: () => import('@views/admin/AnalyticsView.vue'),
+        meta: {
+          title: 'System Analytics',
+          requiresRole: 'SUPER_ADMIN'
+        }
+      },
+      {
+        path: 'admin/email-templates',
+        name: 'email-templates',
+        component: () => import('@views/admin/EmailTemplateManagementView.vue'),
+        meta: {
+          title: 'Email Template Management',
           requiresRole: 'SUPER_ADMIN'
         }
       }

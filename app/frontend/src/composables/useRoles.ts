@@ -97,7 +97,7 @@ export function useRoles(): UseRolesReturn {
 
     // Search filter
     if (filters.search.trim()) {
-      const searchTerm = filters.search.toLowerCase();
+      const searchTerm = filters.search.trim().toLowerCase();
       filtered = filtered.filter(role =>
         role.name.toLowerCase().includes(searchTerm) ||
         role.description.toLowerCase().includes(searchTerm)

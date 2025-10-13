@@ -44,7 +44,18 @@
       "WebFetch(domain:primevue.org)",
       "WebSearch",
       "Bash(timeout:*)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(mkdir:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(cat:*)",
+      "Bash(npx vitest:*)",
+      "Bash(Select-String -Pattern \"All files\")",
+      "Bash(if [ -f coverage/coverage-summary.json ])",
+      "Bash(then cat coverage/coverage-summary.json)",
+      "Bash(python -c \"import sys, json; data = json.load(sys.stdin); print(f\"\"Coverage: {data[''''total''''][''''lines''''][''''pct'''']}%\"\")\")",
+      "Bash(fi)",
+      "Bash(tee:*)"
     ],
     "deny": [],
     "ask": []

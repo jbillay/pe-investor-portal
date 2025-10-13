@@ -313,7 +313,14 @@ export const useAuthStore = defineStore('auth', () => {
         });
       } catch (err) {
         console.warn('Failed to parse stored user data:', err);
-        logout();
+        // Logout synchronously by clearing state directly
+        user.value = null;
+        accessToken.value = null;
+        refreshToken.value = null;
+        error.value = null;
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
       }
     } else {
       console.log('No stored user data or access token found');

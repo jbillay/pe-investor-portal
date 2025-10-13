@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
+import { EmailModule } from './email/email.module';
 import { InvestmentModule } from './investment/investment.module';
 import { FundModule } from './fund/fund.module';
 import { HealthController } from './health/health.controller';
@@ -24,6 +25,7 @@ import { CommonServicesModule } from './common/services/common-services.module';
     CommonServicesModule,
     AuthModule,
     AdminModule,
+    EmailModule,
     InvestmentModule,
     FundModule,
   ],

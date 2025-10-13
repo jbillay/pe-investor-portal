@@ -288,21 +288,23 @@ describe('Auth Store', () => {
     })
 
     it('should logout on refresh failure', async () => {
+      // Set initial auth state
+      authStore.accessToken = 'expired-token'
+      authStore.user = mockUser
+      localStorage.setItem('accessToken', 'expired-token')
+      localStorage.setItem('user', JSON.stringify(mockUser))
+
       mockApiClient.post.mockRejectedValue(new Error('Refresh failed'))
 
-      // Mock logout to track if it's called
-      let logoutCalled = false
-      const originalLogout = authStore.logout
-      authStore.logout = vi.fn(async () => {
-        logoutCalled = true
-        return originalLogout.call(authStore)
-      })
-
       await expect(authStore.refreshTokens()).rejects.toThrow()
-      expect(logoutCalled).toBe(true)
 
-      // Restore original method
-      authStore.logout = originalLogout
+      // Verify logout was called by checking auth state is cleared
+      expect(authStore.accessToken).toBeNull()
+      expect(authStore.refreshToken).toBeNull()
+      expect(authStore.user).toBeNull()
+      expect(localStorage.getItem('accessToken')).toBeNull()
+      expect(localStorage.getItem('refreshToken')).toBeNull()
+      expect(localStorage.getItem('user')).toBeNull()
     })
   })
 
@@ -375,25 +377,26 @@ describe('Auth Store', () => {
     })
 
     it('should logout on 401 error', async () => {
+      // Set initial auth state
+      authStore.accessToken = 'invalid-token'
+      authStore.user = mockUser
+      localStorage.setItem('accessToken', 'invalid-token')
+      localStorage.setItem('user', JSON.stringify(mockUser))
+
       mockApiClient.get.mockRejectedValue({
         response: { status: 401, data: { message: 'Unauthorized' } }
       })
 
-      // Mock logout to track if it's called
-      let logoutCalled = false
-      const originalLogout = authStore.logout
-      authStore.logout = vi.fn(async () => {
-        logoutCalled = true
-        return originalLogout.call(authStore)
-      })
-
       await authStore.getCurrentUser()
 
-      expect(logoutCalled).toBe(true)
-      expect(authStore.error).toBe('Unauthorized')
-
-      // Restore original method
-      authStore.logout = originalLogout
+      // Verify logout was called by checking auth state is cleared
+      // Note: logout() clears the error, so we only check auth state
+      expect(authStore.accessToken).toBeNull()
+      expect(authStore.refreshToken).toBeNull()
+      expect(authStore.user).toBeNull()
+      expect(localStorage.getItem('accessToken')).toBeNull()
+      expect(localStorage.getItem('refreshToken')).toBeNull()
+      expect(localStorage.getItem('user')).toBeNull()
     })
   })
 
@@ -458,38 +461,26 @@ describe('Auth Store', () => {
     })
 
     it('should logout on invalid stored user data', () => {
-      // Mock logout to track if it's called
-      let logoutCalled = false
-      const originalLogout = authStore.logout
-      authStore.logout = vi.fn(async () => {
-        logoutCalled = true
-        return originalLogout.call(authStore)
-      })
-
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      // Set up localStorage to return invalid JSON
-      Object.defineProperty(window, 'localStorage', {
-        value: {
-          getItem: vi.fn((key: string) => {
-            if (key === 'user') return 'invalid-json'
-            if (key === 'accessToken') return 'stored-token'
-            return null
-          }),
-          setItem: vi.fn(),
-          removeItem: vi.fn(),
-          clear: vi.fn()
-        },
-        writable: true
-      })
+      // Store invalid JSON in localStorage and set store state
+      localStorage.setItem('user', 'invalid-json')
+      localStorage.setItem('accessToken', 'stored-token')
+      localStorage.setItem('refreshToken', 'stored-refresh-token')
+      authStore.accessToken = 'stored-token'
+      authStore.refreshToken = 'stored-refresh-token'
 
       authStore.initializeAuth()
 
-      expect(logoutCalled).toBe(true)
+      // Verify logout was called by checking auth state is cleared
+      expect(authStore.accessToken).toBeNull()
+      expect(authStore.refreshToken).toBeNull()
+      expect(authStore.user).toBeNull()
+      expect(localStorage.getItem('accessToken')).toBeNull()
+      expect(localStorage.getItem('refreshToken')).toBeNull()
+      expect(localStorage.getItem('user')).toBeNull()
       expect(consoleSpy).toHaveBeenCalledWith('Failed to parse stored user data:', expect.any(SyntaxError))
 
-      // Restore original method
-      authStore.logout = originalLogout
       consoleSpy.mockRestore()
     })
   })

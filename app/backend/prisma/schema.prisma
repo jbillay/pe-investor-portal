@@ -443,3 +443,87 @@ model Communication {
   @@index([publishedAt])
   @@map("communications")
 }
+
+// Email Template model for dynamic email generation
+model EmailTemplate {
+  id              String    @id @default(cuid())
+  name            String    @unique // e.g., "USER_ACCOUNT_CREATED"
+  displayName     String    // e.g., "Account Created Notification"
+  description     String?
+  subject         String    // Supports mustache: "Welcome {{firstName}}!"
+  htmlBody        String    @db.Text // HTML version with mustache
+  textBody        String    @db.Text // Plain text version with mustache
+  category        String    // ACCOUNT, DOCUMENT, CAPITAL_CALL, DISTRIBUTION, SYSTEM
+  variables       Json      // Schema of required/optional variables
+  isActive        Boolean   @default(true)
+  isSystem        Boolean   @default(false) // System templates can't be deleted
+  version         Int       @default(1)
+  createdBy       String
+  updatedBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  emailLogs       EmailLog[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([name])
+  @@map("email_templates")
+}
+
+// Email Log model for tracking sent emails
+model EmailLog {
+  id              String    @id @default(cuid())
+  templateId      String?
+  recipientEmail  String
+  recipientName   String?
+  subject         String
+  htmlBody        String    @db.Text
+  textBody        String    @db.Text
+  status          String    @default("PENDING") // PENDING, SENT, FAILED, BOUNCED
+  variables       Json?     // Variables used for this email
+  errorMessage    String?
+  sentAt          DateTime?
+  openedAt        DateTime? // Track email opens (optional)
+  clickedAt       DateTime? // Track clicks (optional)
+  provider        String?   // SMTP, SENDGRID, SES, etc.
+  externalId      String?   // Provider's message ID
+  retryCount      Int       @default(0)
+  maxRetries      Int       @default(3)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  template        EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([recipientEmail])
+  @@index([templateId])
+  @@index([createdAt])
+  @@map("email_logs")
+}
+
+// Email Queue model for database-backed queue
+model EmailQueue {
+  id              String    @id @default(cuid())
+  templateId      String?
+  recipientEmail  String
+  recipientName   String?
+  variables       Json
+  priority        Int       @default(5) // 1=highest, 10=lowest
+  status          String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  attempts        Int       @default(0)
+  maxAttempts     Int       @default(3)
+  scheduledFor    DateTime  @default(now()) // Allow scheduled emails
+  processedAt     DateTime?
+  errorMessage    String?
+  emailLogId      String?   // Link to final email log
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status, scheduledFor])
+  @@index([priority])
+  @@index([recipientEmail])
+  @@map("email_queue")
+}
