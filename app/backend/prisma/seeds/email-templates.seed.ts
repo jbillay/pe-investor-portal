@@ -46,9 +46,21 @@ const EMAIL_TEMPLATES = [
                 <li>Access important documents</li>
                 <li>Review performance reports</li>
               </ul>
-              <p style="color: #374151; font-size: 16px; line-height: 24px; margin: 0 0 30px 0;">
-                Click the button below to access your account:
+              <p style="color: #374151; font-size: 16px; line-height: 24px; margin: 0 0 20px 0;">
+                Your account has been secured with a temporary password. You will be required to change this password on your first login.
               </p>
+              <!-- Temporary Password Box -->
+              <table style="width: 100%; background-color: #fef3c7; border: 2px solid #f59e0b; border-radius: 6px; padding: 20px; margin: 0 0 20px 0;">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 10px 0; color: #92400e; font-size: 14px; font-weight: bold;">🔐 TEMPORARY PASSWORD</p>
+                    <p style="margin: 0 0 15px 0; color: #1f2937; font-size: 20px; font-family: monospace; font-weight: bold; letter-spacing: 1px;">{{tempPassword}}</p>
+                    <p style="margin: 0; color: #92400e; font-size: 12px;">
+                      <strong>Important:</strong> This password expires on {{expiresAt}}. Please log in and change it immediately.
+                    </p>
+                  </td>
+                </tr>
+              </table>
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
@@ -62,9 +74,12 @@ const EMAIL_TEMPLATES = [
           </tr>
           <!-- Footer -->
           <tr>
-            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <td style="background-color: #fef3c7; padding: 20px; text-align: center; border-top: 1px solid #fbbf24;">
+              <p style="color: #92400e; font-size: 14px; margin: 0 0 10px 0;">
+                <strong>Security Notice:</strong> Never share your password with anyone. Our team will never ask for your password.
+              </p>
               <p style="color: #6b7280; font-size: 14px; margin: 0;">
-                If you have any questions, please contact our support team.
+                If you have any questions, please contact our support team at {{supportEmail}}.
               </p>
             </td>
           </tr>
@@ -84,15 +99,25 @@ Your account has been successfully created. You now have access to the investor 
 - Access important documents
 - Review performance reports
 
+🔐 TEMPORARY PASSWORD
+{{tempPassword}}
+
+IMPORTANT: This password expires on {{expiresAt}}. Please log in and change it immediately.
+
 Access your account: {{loginUrl}}
 
-If you have any questions, please contact our support team.`,
+Security Notice: Never share your password with anyone. Our team will never ask for your password.
+
+If you have any questions, please contact our support team at {{supportEmail}}.`,
     variables: [
       { name: 'firstName', type: 'string', required: true, description: 'User first name', example: 'John' },
       { name: 'lastName', type: 'string', required: false, description: 'User last name', example: 'Doe' },
       { name: 'email', type: 'string', required: true, description: 'User email', example: 'john@example.com' },
       { name: 'platformName', type: 'string', required: true, description: 'Platform name', example: 'Investor Portal', defaultValue: 'Investor Portal' },
       { name: 'loginUrl', type: 'string', required: true, description: 'Login URL', example: 'https://portal.example.com/login' },
+      { name: 'tempPassword', type: 'string', required: true, description: 'Temporary password', example: 'AbC#123xyz@' },
+      { name: 'expiresAt', type: 'string', required: true, description: 'Password expiration date/time', example: 'January 15, 2025, 3:00 PM' },
+      { name: 'supportEmail', type: 'string', required: true, description: 'Support email address', example: 'support@portal.com', defaultValue: 'support@pe-portal.com' },
     ],
     isActive: true,
     isSystem: true,

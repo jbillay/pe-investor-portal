@@ -612,4 +612,261 @@ describe('Auth Store', () => {
       expect(authStore.error).toBeNull()
     })
   })
+
+  describe('Set Password Action', () => {
+    const setPasswordData = {
+      tempPassword: 'TempPassword123@',
+      newPassword: 'NewSecurePassword123@',
+      confirmPassword: 'NewSecurePassword123@'
+    }
+
+    const mockSetPasswordResponse = {
+      status: 'success' as const,
+      data: {
+        message: 'Password set successfully',
+        user: mockUser,
+        accessToken: 'new-access-token-after-password-set',
+        refreshToken: 'new-refresh-token-after-password-set'
+      }
+    }
+
+    const mockRolesResponse = {
+      status: 'success' as const,
+      data: {
+        roles: [{ name: 'INVESTOR' }],
+        permissions: [{ name: 'READ_PROFILE' }]
+      }
+    }
+
+    beforeEach(() => {
+      // Set up initial state with temp password flag
+      authStore.user = mockUser
+      authStore.accessToken = 'temp-token'
+      authStore.refreshToken = 'temp-refresh'
+      authStore.requiresPasswordChange = true
+      localStorage.setItem('requiresPasswordChange', 'true')
+    })
+
+    it('should set password successfully and update auth state', async () => {
+      mockApiClient.post.mockResolvedValue(mockSetPasswordResponse)
+      mockApiClient.get.mockResolvedValue(mockRolesResponse)
+
+      await authStore.setPassword(setPasswordData)
+
+      expect(mockApiClient.post).toHaveBeenCalledWith('/auth/set-password', setPasswordData)
+      expect(mockApiClient.get).toHaveBeenCalledWith('admin/roles/me/roles')
+
+      expect(authStore.user).toEqual({
+        ...mockUser,
+        roles: ['INVESTOR'],
+        permissions: ['READ_PROFILE']
+      })
+      expect(authStore.accessToken).toBe('new-access-token-after-password-set')
+      expect(authStore.refreshToken).toBe('new-refresh-token-after-password-set')
+      expect(authStore.requiresPasswordChange).toBe(false)
+      expect(authStore.error).toBeNull()
+      expect(authStore.isLoading).toBe(false)
+
+      // Check localStorage calls
+      expect(mockStorage.setItem).toHaveBeenCalledWith('accessToken', 'new-access-token-after-password-set')
+      expect(mockStorage.setItem).toHaveBeenCalledWith('refreshToken', 'new-refresh-token-after-password-set')
+      expect(mockStorage.removeItem).toHaveBeenCalledWith('requiresPasswordChange')
+      expect(mockStorage.setItem).toHaveBeenCalledWith('user', JSON.stringify({
+        ...mockUser,
+        roles: ['INVESTOR'],
+        permissions: ['READ_PROFILE']
+      }))
+    })
+
+    it('should handle direct response format', async () => {
+      const directResponse = {
+        message: 'Password set successfully',
+        user: mockUser,
+        accessToken: 'direct-access-token',
+        refreshToken: 'direct-refresh-token'
+      }
+
+      mockApiClient.post.mockResolvedValue(directResponse)
+      mockApiClient.get.mockResolvedValue(mockRolesResponse)
+
+      await authStore.setPassword(setPasswordData)
+
+      expect(authStore.accessToken).toBe('direct-access-token')
+      expect(authStore.refreshToken).toBe('direct-refresh-token')
+      expect(authStore.requiresPasswordChange).toBe(false)
+    })
+
+    it('should handle set password failure', async () => {
+      const errorMessage = 'Invalid temporary password'
+      mockApiClient.post.mockRejectedValue({
+        response: { data: { message: errorMessage } }
+      })
+
+      await expect(authStore.setPassword(setPasswordData)).rejects.toThrow()
+
+      expect(authStore.error).toBe(errorMessage)
+      expect(authStore.isLoading).toBe(false)
+      expect(authStore.requiresPasswordChange).toBe(true)
+    })
+
+    it('should fetch roles after password set', async () => {
+      mockApiClient.post.mockResolvedValue(mockSetPasswordResponse)
+      mockApiClient.get.mockResolvedValue(mockRolesResponse)
+
+      await authStore.setPassword(setPasswordData)
+
+      expect(mockApiClient.get).toHaveBeenCalledWith('admin/roles/me/roles')
+      expect(authStore.user?.roles).toEqual(['INVESTOR'])
+      expect(authStore.user?.permissions).toEqual(['READ_PROFILE'])
+    })
+
+    it('should handle password set even if roles fetch fails', async () => {
+      mockApiClient.post.mockResolvedValue(mockSetPasswordResponse)
+      mockApiClient.get.mockRejectedValue(new Error('Roles fetch failed'))
+
+      await authStore.setPassword(setPasswordData)
+
+      expect(authStore.user).toEqual({
+        ...mockUser,
+        roles: [],
+        permissions: []
+      })
+      expect(authStore.accessToken).toBe('new-access-token-after-password-set')
+      expect(authStore.requiresPasswordChange).toBe(false)
+    })
+
+    it('should set loading state during password set', async () => {
+      let resolveSetPassword: (value: any) => void
+      const setPasswordPromise = new Promise(resolve => {
+        resolveSetPassword = resolve
+      })
+      mockApiClient.post.mockReturnValue(setPasswordPromise)
+      mockApiClient.get.mockResolvedValue(mockRolesResponse)
+
+      const setPasswordCall = authStore.setPassword(setPasswordData)
+
+      expect(authStore.isLoading).toBe(true)
+
+      resolveSetPassword!(mockSetPasswordResponse)
+      await setPasswordCall
+
+      expect(authStore.isLoading).toBe(false)
+    })
+  })
+
+  describe('Requires Password Change State', () => {
+    it('should initialize requiresPasswordChange from localStorage', () => {
+      // Set up localStorage mock to return stored data
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          getItem: vi.fn((key: string) => {
+            if (key === 'requiresPasswordChange') return 'true'
+            if (key === 'user') return JSON.stringify(mockUser)
+            if (key === 'accessToken') return 'stored-token'
+            if (key === 'refreshToken') return 'stored-refresh-token'
+            return null
+          }),
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
+          clear: vi.fn()
+        },
+        writable: true
+      })
+
+      // Create a new store instance that will use the mocked localStorage
+      setActivePinia(createPinia())
+      const newAuthStore = useAuthStore()
+
+      expect(newAuthStore.requiresPasswordChange).toBe(true)
+    })
+
+    it('should set requiresPasswordChange on login with temp password', async () => {
+      const loginWithTempPassword = {
+        status: 'success' as const,
+        data: {
+          user: mockUser,
+          accessToken: 'temp-access-token',
+          refreshToken: 'temp-refresh-token',
+          requiresPasswordChange: true
+        }
+      }
+
+      const mockRolesResponse = {
+        status: 'success' as const,
+        data: {
+          roles: [{ name: 'INVESTOR' }],
+          permissions: [{ name: 'READ_PROFILE' }]
+        }
+      }
+
+      mockApiClient.post.mockResolvedValue(loginWithTempPassword)
+      mockApiClient.get.mockResolvedValue(mockRolesResponse)
+
+      await authStore.login({
+        email: 'test@example.com',
+        password: 'tempPassword'
+      })
+
+      expect(authStore.requiresPasswordChange).toBe(true)
+      expect(mockStorage.setItem).toHaveBeenCalledWith('requiresPasswordChange', 'true')
+    })
+
+    it('should clear requiresPasswordChange on login without temp password', async () => {
+      // Set initial temp password state
+      authStore.requiresPasswordChange = true
+      localStorage.setItem('requiresPasswordChange', 'true')
+
+      const mockRolesResponse = {
+        status: 'success' as const,
+        data: {
+          roles: [{ name: 'INVESTOR' }],
+          permissions: [{ name: 'READ_PROFILE' }]
+        }
+      }
+
+      mockApiClient.post.mockResolvedValue(mockLoginResponse)
+      mockApiClient.get.mockResolvedValue(mockRolesResponse)
+
+      await authStore.login({
+        email: 'test@example.com',
+        password: 'regularPassword'
+      })
+
+      expect(authStore.requiresPasswordChange).toBe(false)
+      expect(mockStorage.removeItem).toHaveBeenCalledWith('requiresPasswordChange')
+    })
+
+    it('should clear requiresPasswordChange on logout', async () => {
+      authStore.requiresPasswordChange = true
+      authStore.accessToken = 'test-token'
+      localStorage.setItem('requiresPasswordChange', 'true')
+
+      mockApiClient.post.mockResolvedValue({ status: 'success' })
+
+      await authStore.logout()
+
+      expect(authStore.requiresPasswordChange).toBe(false)
+      expect(mockStorage.removeItem).toHaveBeenCalledWith('requiresPasswordChange')
+    })
+
+    it('should clear requiresPasswordChange on initialization with invalid user data', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      // Store invalid JSON in localStorage and set store state
+      localStorage.setItem('user', 'invalid-json')
+      localStorage.setItem('accessToken', 'stored-token')
+      localStorage.setItem('refreshToken', 'stored-refresh-token')
+      localStorage.setItem('requiresPasswordChange', 'true')
+      authStore.accessToken = 'stored-token'
+      authStore.refreshToken = 'stored-refresh-token'
+      authStore.requiresPasswordChange = true
+
+      authStore.initializeAuth()
+
+      expect(authStore.requiresPasswordChange).toBe(false)
+      expect(localStorage.getItem('requiresPasswordChange')).toBeNull()
+
+      consoleSpy.mockRestore()
+    })
+  })
 })

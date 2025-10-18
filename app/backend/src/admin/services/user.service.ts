@@ -37,6 +37,14 @@ import {
   SortOrder,
   UserStatus
 } from '../dto';
+import { CreateUserAdminDto } from '../dto/create-user-admin.dto';
+import { CreateUserResponseDto } from '../dto/create-user-response.dto';
+import { EmailService } from '../../email/services/email.service';
+import {
+  generateTempPassword,
+  getTempPasswordExpiration,
+} from '../../common/utils/password-generator.util';
+import { PASSWORD_AUDIT_ACTIONS } from '../../common/constants/password.constants';
 
 /**
  * User Service
@@ -68,7 +76,8 @@ export class UserService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly auditLogger: AuditLoggerService
+    private readonly auditLogger: AuditLoggerService,
+    private readonly emailService: EmailService
   ) {
     this.saltRounds = this.config.get<number>('auth.saltRounds', 12);
     this.maxUsersPerBulkOperation = this.config.get<number>('user.maxBulkOperationSize', 100);
@@ -481,6 +490,180 @@ export class UserService {
     } catch (error) {
       if (error instanceof ConflictException) throw error;
       this.logger.error(`Error in create: ${error instanceof Error ? error.message : 'Unknown error'}`, error instanceof Error ? error.stack : undefined);
+      throw new InternalServerErrorException('Failed to create user');
+    }
+  }
+
+  /**
+   * Create a new user account with temporary password (Admin flow)
+   * Generates secure temporary password and sends welcome email
+   */
+  async createUserWithTempPassword(
+    createUserAdminDto: CreateUserAdminDto,
+    createdById: string
+  ): Promise<CreateUserResponseDto> {
+    try {
+      // Check if email already exists
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: createUserAdminDto.email }
+      });
+
+      if (existingUser) {
+        throw new ConflictException('User with this email already exists');
+      }
+
+      // Generate temporary password
+      const tempPassword = generateTempPassword();
+      const tempPasswordExpiresAt = getTempPasswordExpiration();
+
+      // Hash temporary password
+      const hashedPassword = await bcrypt.hash(tempPassword, this.saltRounds);
+
+      // Start transaction
+      const result = await this.prisma.$transaction(async (tx: any) => {
+        // Create user with temp password
+        const user = await tx.user.create({
+          data: {
+            email: createUserAdminDto.email,
+            password: hashedPassword,
+            firstName: createUserAdminDto.firstName,
+            lastName: createUserAdminDto.lastName,
+            isActive: true, // Immediately active
+            isVerified: false, // Not verified until they set password
+            isTempPassword: true, // Flag for temp password
+            tempPasswordExpiresAt,
+          }
+        });
+
+        // Create user profile
+        await tx.userProfile.create({
+          data: {
+            userId: user.id,
+            timezone: createUserAdminDto.timezone ?? 'UTC',
+            language: 'en', // Default to English as per requirements
+            preferences: {}
+          }
+        });
+
+        // Assign default roles
+        const defaultRoles = await tx.role.findMany({
+          where: { isDefault: true, isActive: true }
+        });
+
+        const assignedRoles: string[] = [];
+
+        for (const role of defaultRoles) {
+          await tx.userRole.create({
+            data: {
+              userId: user.id,
+              roleId: role.id,
+              isActive: true
+            }
+          });
+
+          await tx.roleAssignment.create({
+            data: {
+              userId: user.id,
+              roleId: role.id,
+              assignedBy: createdById,
+              reason: 'Default role assignment for new user',
+              isActive: true
+            }
+          });
+
+          assignedRoles.push(role.name);
+        }
+
+        return { user, assignedRoles };
+      });
+
+      // Get user profile
+      const userProfile = await this.prisma.userProfile.findUnique({
+        where: { userId: result.user.id }
+      });
+
+      // Send welcome email with temporary password
+      let emailSent = false;
+      let emailError: string | undefined;
+
+      try {
+        const loginUrl = this.config.get<string>('app.frontendUrl', 'http://localhost:3000') + '/login';
+        const supportEmail = this.config.get<string>('email.supportEmail', 'support@pe-portal.com');
+        const portalName = this.config.get<string>('app.name', 'PE Investor Portal');
+
+        await this.emailService.sendTemplatedEmail({
+          templateName: 'USER_ACCOUNT_CREATED',
+          recipientEmail: result.user.email,
+          recipientName: `${result.user.firstName} ${result.user.lastName}`,
+          variables: {
+            firstName: result.user.firstName,
+            lastName: result.user.lastName,
+            email: result.user.email,
+            platformName: portalName,
+            loginUrl,
+            tempPassword, // Temporary password (shown only once in email)
+            expiresAt: tempPasswordExpiresAt.toLocaleString('en-US', {
+              dateStyle: 'medium',
+              timeStyle: 'short'
+            }),
+            supportEmail,
+          }
+        });
+
+        emailSent = true;
+        this.logger.log(`Welcome email sent successfully to: ${result.user.email}`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Failed to send welcome email: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+        emailError = errorMessage;
+        // Don't throw - user is created, just email failed
+      }
+
+      // Log audit event
+      await this.auditLogger.logUserEvent(
+        'USER_CREATED',
+        createdById,
+        result.user.id,
+        undefined,
+        undefined,
+        {
+          email: result.user.email,
+          roles: result.assignedRoles,
+          tempPasswordGenerated: true,
+          tempPasswordExpiresAt: tempPasswordExpiresAt.toISOString(),
+          emailSent
+        }
+      );
+
+      // Emit event
+      this.eventEmitter.emit('user.created.with.temp.password', {
+        userId: result.user.id,
+        email: result.user.email,
+        createdBy: createdById,
+        tempPasswordExpiresAt,
+        emailSent,
+        timestamp: new Date()
+      });
+
+      this.logger.log(`User created successfully with temp password: ${result.user.email} by ${createdById}`);
+
+      // Return response (temp password only returned here, never stored!)
+      return {
+        id: result.user.id,
+        email: result.user.email,
+        firstName: result.user.firstName!,
+        lastName: result.user.lastName!,
+        tempPassword, // IMPORTANT: Only returned once!
+        tempPasswordExpiresAt,
+        roles: result.assignedRoles,
+        timezone: userProfile?.timezone ?? 'UTC',
+        emailSent,
+        emailError,
+        createdAt: result.user.createdAt
+      };
+    } catch (error) {
+      if (error instanceof ConflictException) throw error;
+      this.logger.error(`Error in createUserWithTempPassword: ${error instanceof Error ? error.message : 'Unknown error'}`, error instanceof Error ? error.stack : undefined);
       throw new InternalServerErrorException('Failed to create user');
     }
   }

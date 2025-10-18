@@ -6,6 +6,8 @@ import type {
   LoginCredentials,
   LoginResponse,
   RefreshTokenResponse,
+  SetPasswordRequest,
+  SetPasswordResponse,
 } from '@/types/auth';
 
 export const useAuthStore = defineStore('auth', () => {
@@ -13,6 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null);
   const accessToken = ref<string | null>(localStorage.getItem('accessToken'));
   const refreshToken = ref<string | null>(localStorage.getItem('refreshToken'));
+  const requiresPasswordChange = ref<boolean>(localStorage.getItem('requiresPasswordChange') === 'true');
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
@@ -126,16 +129,27 @@ export const useAuthStore = defineStore('auth', () => {
         user: userData,
         accessToken: token,
         refreshToken: refresh,
+        requiresPasswordChange: needsPasswordChange,
       } = loginData;
 
       console.log('Setting auth state:', {
         userData,
         hasToken: !!token,
         hasRefresh: !!refresh,
+        requiresPasswordChange: needsPasswordChange,
       });
 
       // Save tokens first
       saveTokensToStorage(token, refresh);
+
+      // Store requiresPasswordChange flag
+      if (needsPasswordChange) {
+        requiresPasswordChange.value = true;
+        localStorage.setItem('requiresPasswordChange', 'true');
+      } else {
+        requiresPasswordChange.value = false;
+        localStorage.removeItem('requiresPasswordChange');
+      }
 
       // Fetch user roles and permissions
       const { roles, permissions } = await fetchUserRolesAndPermissions();
@@ -182,11 +196,13 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = null;
       accessToken.value = null;
       refreshToken.value = null;
+      requiresPasswordChange.value = false;
       error.value = null;
 
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('requiresPasswordChange');
     }
   }
 
@@ -298,6 +314,81 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function setPassword(passwordData: SetPasswordRequest): Promise<void> {
+    try {
+      isLoading.value = true;
+      error.value = null;
+
+      console.log('Setting new password...');
+      const response = await apiClient.post<SetPasswordResponse>(
+        '/auth/set-password',
+        passwordData,
+      );
+      console.log('Set password API response:', response);
+
+      // Parse response
+      let setPasswordData: any;
+      try {
+        setPasswordData = parseApiResponse(response, 'user');
+      } catch {
+        // Try direct format
+        if ((response as any).user && (response as any).accessToken) {
+          setPasswordData = response;
+        } else {
+          console.error('Set password response format unexpected:', response);
+          throw new Error('Invalid set password response format');
+        }
+      }
+
+      const {
+        user: userData,
+        accessToken: token,
+        refreshToken: refresh,
+      } = setPasswordData;
+
+      console.log('Password set successfully, updating auth state:', {
+        userData,
+        hasToken: !!token,
+        hasRefresh: !!refresh,
+      });
+
+      // Save new tokens
+      saveTokensToStorage(token, refresh);
+
+      // Clear requiresPasswordChange flag
+      requiresPasswordChange.value = false;
+      localStorage.removeItem('requiresPasswordChange');
+
+      // Fetch user roles and permissions for newly verified user
+      const { roles, permissions } = await fetchUserRolesAndPermissions();
+
+      // Update user data with roles and permissions
+      const completeUserData = updateUserWithRoles(
+        userData,
+        roles,
+        permissions,
+      );
+
+      // Save complete user data
+      saveUserToStorage(completeUserData);
+
+      console.log('Auth state updated after password set:', {
+        isAuthenticated: isAuthenticated.value,
+        userSet: !!user.value,
+        tokenSet: !!accessToken.value,
+        requiresPasswordChange: requiresPasswordChange.value,
+        roles: completeUserData.roles,
+        permissions: completeUserData.permissions,
+      });
+    } catch (err: any) {
+      console.error('Set password API error:', err);
+      error.value = err.response?.data?.message || 'Failed to set password';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   // Initialize auth state from localStorage
   function initializeAuth(): void {
     const storedUser = localStorage.getItem('user');
@@ -310,6 +401,7 @@ export const useAuthStore = defineStore('auth', () => {
           email: parsedUser.email,
           roles: parsedUser.roles,
           isAuthenticated: isAuthenticated.value,
+          requiresPasswordChange: requiresPasswordChange.value,
         });
       } catch (err) {
         console.warn('Failed to parse stored user data:', err);
@@ -317,10 +409,12 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = null;
         accessToken.value = null;
         refreshToken.value = null;
+        requiresPasswordChange.value = false;
         error.value = null;
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
+        localStorage.removeItem('requiresPasswordChange');
       }
     } else {
       console.log('No stored user data or access token found');
@@ -386,6 +480,7 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     accessToken,
     refreshToken,
+    requiresPasswordChange,
     isLoading,
     error,
 
@@ -400,6 +495,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshTokens,
     getCurrentUser,
     updateProfile,
+    setPassword,
     initializeAuth,
     refreshUserRoles,
     hasRole,

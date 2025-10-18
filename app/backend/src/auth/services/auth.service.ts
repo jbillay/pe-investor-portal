@@ -171,6 +171,7 @@ export class AuthService {
         lastName: user.lastName,
       },
       expiresIn: this.getAccessTokenExpirationTime(),
+      requiresPasswordChange: user.isTempPassword || false,
     };
   }
 

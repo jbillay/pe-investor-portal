@@ -11,6 +11,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false, title: 'Sign In' }
   },
   {
+    path: '/set-password',
+    name: 'set-password',
+    component: () => import('@views/auth/SetPasswordView.vue'),
+    meta: { requiresAuth: true, requiresPasswordChange: true, title: 'Set Password' }
+  },
+  {
     path: '/',
     component: () => import('@components/layout/AppLayout.vue'),
     meta: { requiresAuth: true },
@@ -166,6 +172,23 @@ router.beforeEach(async (to, from, next) => {
         query: { redirect: to.fullPath }
       })
       return
+    }
+
+    // Check if user needs to change password
+    if (authStore.requiresPasswordChange) {
+      // If user needs password change but is not on set-password page, redirect
+      if (to.name !== 'set-password') {
+        console.log('User requires password change, redirecting to set-password')
+        next({ name: 'set-password' })
+        return
+      }
+    } else {
+      // If user doesn't need password change but is trying to access set-password, redirect to dashboard
+      if (to.name === 'set-password') {
+        console.log('User does not require password change, redirecting to dashboard')
+        next({ name: 'dashboard' })
+        return
+      }
     }
 
     // Check role-based access control

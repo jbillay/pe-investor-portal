@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from '../database/prisma.module';
 import { AuthModule } from '../auth/auth.module';
+import { EmailModule } from '../email/email.module';
 
 // Controllers
 import { RoleController } from './controllers/role.controller';
@@ -42,6 +43,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
   imports: [
     PrismaModule,
     AuthModule,
+    EmailModule,
     ConfigModule,
     EventEmitterModule,
   ],

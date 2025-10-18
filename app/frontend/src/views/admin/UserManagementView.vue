@@ -26,10 +26,10 @@
               severity="secondary"
             />
             <Button
-              label="Invite User"
+              label="Create User"
               icon="pi pi-user-plus"
               class="p-button-primary admin-action-btn"
-              @click="showInviteDialog = true"
+              @click="showCreateUserDialog = true"
               severity="primary"
             />
           </div>
@@ -58,27 +58,11 @@
       </main>
     </div>
 
-    <!-- User Invite Dialog -->
-    <Dialog
-      v-model:visible="showInviteDialog"
-      header="Invite New User"
-      :modal="true"
-      class="w-96"
-    >
-      <div class="p-4">
-        <p class="text-gray-600 mb-4">
-          User invitation functionality will be implemented here.
-        </p>
-        <div class="flex justify-end gap-2">
-          <Button
-            label="Cancel"
-            class="p-button-outlined"
-            @click="showInviteDialog = false"
-          />
-          <Button label="Send Invite" @click="handleUserInvited" />
-        </div>
-      </div>
-    </Dialog>
+    <!-- User Create Dialog -->
+    <UserCreateDialog
+      v-model:visible="showCreateUserDialog"
+      @user-created="handleUserCreated"
+    />
 
     <!-- Role Management Dialog -->
     <RoleManagementDialog
@@ -121,6 +105,7 @@ import UserManagementPanel from '@/components/admin/UserManagementPanel.vue';
 import RoleManagementDialog from '@/components/admin/RoleManagementDialog.vue';
 import BulkOperationsDialog from '@/components/admin/BulkOperationsDialog.vue';
 import UserEditDialog from '@/components/admin/UserEditDialog.vue';
+import UserCreateDialog from '@/components/admin/UserCreateDialog.vue';
 
 interface UserWithRoles {
   id: string;
@@ -147,7 +132,7 @@ const selectedUser = ref(null);
 const userManagementPanelComponent = ref(null);
 
 // Dialog visibility
-const showInviteDialog = ref(false);
+const showCreateUserDialog = ref(false);
 const roleAssignmentVisible = ref(false);
 const showBulkDialog = ref(false);
 const userEditVisible = ref(false);
@@ -185,14 +170,20 @@ const refreshData = async () => {
   }
 };
 
-const handleUserInvited = () => {
-  showInviteDialog.value = false;
+const handleUserCreated = (result: any) => {
   toast.add({
     severity: 'success',
-    summary: 'Invitation Sent',
-    detail: 'User invitation has been sent successfully',
-    life: 3000
+    summary: 'User Created',
+    detail: `${result.firstName} ${result.lastName} has been created successfully`,
+    life: 4000
   });
+
+  // Refresh user list
+  if (userManagementPanelComponent.value?.refreshData) {
+    userManagementPanelComponent.value.refreshData();
+  }
+
+  showCreateUserDialog.value = false;
 };
 
 const editUser = (user: any) => {

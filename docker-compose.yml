@@ -56,6 +56,19 @@ services:
       start_period: 30s
     command: redis-server /usr/local/etc/redis/redis.conf
 
+  # MailHog - Email Testing Tool (Development)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: myapp-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - app_network
+    profiles:
+      - development
+
   # Database Migration Service
   db-migrate:
     build:

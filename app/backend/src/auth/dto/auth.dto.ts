@@ -111,6 +111,12 @@ export class AuthResponseDto {
     example: 900,
   })
   expiresIn: number;
+
+  @ApiPropertyOptional({
+    description: 'Whether user needs to change their password (temporary password)',
+    example: false,
+  })
+  requiresPasswordChange?: boolean;
 }
 
 export class LogoutDto {

@@ -46,6 +46,8 @@ import { ParseCuidPipe } from '../../common/pipes/parse-cuid.pipe';
 
 import {
   CreateUserDto,
+  CreateUserAdminDto,
+  CreateUserResponseDto,
   UpdateUserDto,
   UpdateUserStatusDto,
   UpdateUserVerificationDto,
@@ -232,31 +234,35 @@ export class UserController {
   }
 
   /**
-   * Create a new user account
+   * Create a new user account with temporary password
    *
-   * @param createUserDto - User creation data
-   * @returns Created user information with temporary credentials
+   * @param createUserAdminDto - User creation data
+   * @returns Created user information with temporary password
    */
   @Post()
   @ApiOperation({
-    summary: 'Create new user',
+    summary: 'Create new user with temporary password',
     description: `
-      Create a new user account with comprehensive validation and security features:
-      - Strong password requirements
+      Create a new user account with auto-generated temporary password (72-hour expiry):
+      - Generates secure temporary password (16+ characters)
+      - Sends welcome email with temp password
       - Email uniqueness validation
-      - Optional role assignment
-      - Automatic profile creation
+      - Automatic role assignment (default INVESTOR role)
+      - Automatic profile creation with timezone
       - Email verification workflow
-      - Audit trail creation
+      - Comprehensive audit trail
 
-      Security: Requires SUPER_ADMIN role or USER_CREATE permission
-      Rate limited to prevent abuse
+      The temporary password must be changed on first login.
+      Users will be automatically redirected to password change screen.
+
+      Security: Requires SUPER_ADMIN role
+      Rate limited to prevent abuse (10 requests per 5 minutes)
     `
   })
   @ApiResponse({
     status: 201,
-    description: 'User successfully created',
-    type: UserCreatedResponseDto
+    description: 'User successfully created with temporary password',
+    type: CreateUserResponseDto
   })
   @ApiResponse({
     status: 400,
@@ -270,13 +276,13 @@ export class UserController {
   @RequirePermissions('USER:CREATE')
   @RequireAnyRole('SUPER_ADMIN')
   @RateLimit({ limit: 10, window: 300 }) // 10 requests per 5 minutes
-  @AuditLog('USER_CREATED')
+  @AuditLog('USER_CREATED_WITH_TEMP_PASSWORD')
   async create(
-    @Body(ValidationPipe) createUserDto: CreateUserDto,
+    @Body(ValidationPipe) createUserAdminDto: CreateUserAdminDto,
     @Request() req: AuthenticatedRequest
-  ): Promise<UserCreatedResponseDto> {
-    this.logger.log(`User ${req.user.id} creating new user: ${createUserDto.email}`);
-    return this.userService.create(createUserDto, req.user.id);
+  ): Promise<CreateUserResponseDto> {
+    this.logger.log(`User ${req.user.id} creating new user with temp password: ${createUserAdminDto.email}`);
+    return this.userService.createUserWithTempPassword(createUserAdminDto, req.user.id);
   }
 
   /**

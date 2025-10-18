@@ -23,11 +23,53 @@ export interface LoginResponse {
   user: User
   accessToken: string
   refreshToken: string
+  requiresPasswordChange?: boolean
+  expiresIn?: number
 }
 
 export interface RefreshTokenResponse {
   accessToken: string
   refreshToken: string
+}
+
+export interface SetPasswordRequest {
+  tempPassword: string
+  newPassword: string
+  confirmPassword: string
+}
+
+export interface SetPasswordResponse {
+  message: string
+  accessToken: string
+  refreshToken: string
+  user: {
+    id: string
+    email: string
+    firstName: string
+    lastName: string
+    roles: string[]
+  }
+}
+
+export interface CreateUserAdminRequest {
+  email: string
+  firstName: string
+  lastName: string
+  timezone?: string
+}
+
+export interface CreateUserResponse {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  tempPassword: string
+  tempPasswordExpiresAt: string
+  roles: string[]
+  timezone: string
+  emailSent: boolean
+  emailError?: string
+  createdAt: string
 }
 
 export interface AuthState {

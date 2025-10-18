@@ -16,16 +16,19 @@ datasource db {
 
 // User authentication model
 model User {
-  id         String    @id @default(cuid())
-  email      String    @unique
-  password   String
-  firstName  String?
-  lastName   String?
-  isActive   Boolean   @default(true)
-  isVerified Boolean   @default(false)
-  lastLogin  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  password              String
+  firstName             String?
+  lastName              String?
+  isActive              Boolean   @default(true)
+  isVerified            Boolean   @default(false)
+  isTempPassword        Boolean   @default(false) // Flag for temporary password
+  tempPasswordExpiresAt DateTime? // Expiration time for temp password
+  passwordSetAt         DateTime? // When permanent password was set
+  lastLogin             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   // Relations
   sessions    Session[]

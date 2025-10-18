@@ -234,13 +234,20 @@ const handleLogin = async () => {
     console.log('Login successful, auth state:', {
       isAuthenticated: authStore.isAuthenticated,
       user: authStore.user,
-      accessToken: !!authStore.accessToken
+      accessToken: !!authStore.accessToken,
+      requiresPasswordChange: authStore.requiresPasswordChange
     })
 
-    // Redirect to intended page or dashboard
-    const redirectTo = route.query.redirect as string || '/'
-    console.log('Attempting to redirect to:', redirectTo)
-    await router.push(redirectTo)
+    // Check if user needs to change password
+    if (authStore.requiresPasswordChange) {
+      console.log('User requires password change, redirecting to set-password')
+      await router.push({ name: 'set-password' })
+    } else {
+      // Redirect to intended page or dashboard
+      const redirectTo = route.query.redirect as string || '/'
+      console.log('Attempting to redirect to:', redirectTo)
+      await router.push(redirectTo)
+    }
     console.log('Router push completed')
   } catch (error) {
     // Error is handled by the auth store and will be displayed

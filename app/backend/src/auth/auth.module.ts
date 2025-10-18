@@ -6,6 +6,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
 import { AuthService } from './services/auth.service';
 import { SessionService } from './services/session.service';
+import { PasswordService } from './services/password.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -41,6 +42,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
   providers: [
     AuthService,
     SessionService,
+    PasswordService,
     JwtStrategy,
     JwtAuthGuard,
     PrismaService,
@@ -48,6 +50,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
   exports: [
     AuthService,
     SessionService,
+    PasswordService,
     JwtAuthGuard,
     PrismaService,
   ],

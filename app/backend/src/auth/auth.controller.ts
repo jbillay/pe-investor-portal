@@ -20,6 +20,7 @@ import {
   ApiConflictResponse,
 } from '@nestjs/swagger';
 import { AuthService } from './services/auth.service';
+import { PasswordService } from './services/password.service';
 import {
   LoginDto,
   RegisterDto,
@@ -27,6 +28,7 @@ import {
   LogoutDto,
   AuthResponseDto,
 } from './dto/auth.dto';
+import { SetPasswordDto, SetPasswordResponseDto } from './dto/set-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
@@ -36,7 +38,10 @@ import { Throttle } from '@nestjs/throttler';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private passwordService: PasswordService,
+  ) {}
 
   @ApiOperation({
     summary: 'Register new user',
@@ -286,6 +291,85 @@ export class AuthController {
       valid: true,
       user,
     };
+  }
+
+  @ApiOperation({
+    summary: 'Set permanent password',
+    description: `
+      Set a permanent password after logging in with a temporary password.
+      This endpoint is used when a user has been created by an admin with a temporary password.
+
+      Requirements:
+      - User must be authenticated with temporary password
+      - Temporary password must not be expired (72-hour validity)
+      - New password must meet security requirements:
+        - Minimum 12 characters (industry best practice)
+        - At least one uppercase letter
+        - At least one lowercase letter
+        - At least one number
+        - At least one special character
+        - Cannot be the same as temporary password
+        - Cannot contain user's email
+
+      After successful password change:
+      - All existing sessions are revoked
+      - New JWT tokens are generated
+      - User is marked as verified
+      - Audit log entry is created
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password set successfully, returns new tokens',
+    type: SetPasswordResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data or password validation failed',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Password validation failed' },
+        errors: {
+          type: 'array',
+          items: { type: 'string' },
+          example: [
+            'Password must be at least 12 characters long',
+            'Password must contain at least one uppercase letter',
+          ],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid temporary password',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+  })
+  @ApiResponse({
+    status: 410,
+    description: 'Temporary password has expired',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Invalid or missing JWT token',
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'Too many password change attempts',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiBody({ type: SetPasswordDto })
+  @Post('set-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 300000 } }) // 5 requests per 5 minutes
+  async setPassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() setPasswordDto: SetPasswordDto,
+  ): Promise<SetPasswordResponseDto> {
+    return this.passwordService.setPassword(user.id, setPasswordDto);
   }
 
   private getClientIp(req: Request): string {
