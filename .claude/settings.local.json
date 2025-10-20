@@ -55,7 +55,8 @@
       "Bash(then cat coverage/coverage-summary.json)",
       "Bash(python -c \"import sys, json; data = json.load(sys.stdin); print(f\"\"Coverage: {data[''''total''''][''''lines''''][''''pct'''']}%\"\")\")",
       "Bash(fi)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "Bash(npx prisma migrate:*)"
     ],
     "deny": [],
     "ask": []
