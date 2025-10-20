@@ -56,7 +56,12 @@
       "Bash(python -c \"import sys, json; data = json.load(sys.stdin); print(f\"\"Coverage: {data[''''total''''][''''lines''''][''''pct'''']}%\"\")\")",
       "Bash(fi)",
       "Bash(tee:*)",
-      "Bash(npx prisma migrate:*)"
+      "Bash(npx prisma migrate:*)",
+      "Bash(dir:*)",
+      "Bash(echo:*)",
+      "Bash(powershell -Command \"Expand-Archive -Path ''hello-world-plugin.zip'' -DestinationPath ''temp-extract'' -Force; Get-ChildItem ''temp-extract'' -Recurse | Select-Object FullName; Remove-Item -Recurse -Force ''temp-extract''\")",
+      "Bash(npx playwright test:*)",
+      "Bash(node test-plugins-page.mjs:*)"
     ],
     "deny": [],
     "ask": []
