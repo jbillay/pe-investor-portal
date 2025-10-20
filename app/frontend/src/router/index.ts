@@ -114,6 +114,15 @@ const routes: RouteRecordRaw[] = [
           title: 'Email Template Management',
           requiresRole: 'SUPER_ADMIN'
         }
+      },
+      {
+        path: 'admin/plugins',
+        name: 'admin-plugins',
+        component: () => import('@views/admin/PluginManagementView.vue'),
+        meta: {
+          title: 'Plugin Management',
+          requiresRole: 'SUPER_ADMIN'
+        }
       }
     ]
   },

@@ -62,7 +62,12 @@ export class AuthController {
   @ApiBody({ type: RegisterDto })
   @Public()
   @Post('register')
-  @Throttle({ default: { limit: 5, ttl: 300000 } }) // 5 requests per 5 minutes
+  @Throttle({
+    default: {
+      limit: process.env.NODE_ENV === 'test' ? 500 : 5,
+      ttl: process.env.NODE_ENV === 'test' ? 60000 : 300000
+    }
+  }) // Test: 500/min, Production: 5/5min
   async register(
     @Body() registerDto: RegisterDto,
     @Req() req: Request,
@@ -93,7 +98,12 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 10, ttl: 900000 } }) // 10 requests per 15 minutes
+  @Throttle({
+    default: {
+      limit: process.env.NODE_ENV === 'test' ? 1000 : 10,
+      ttl: process.env.NODE_ENV === 'test' ? 60000 : 900000
+    }
+  }) // Test: 1000/min, Production: 10/15min
   async login(
     @Body() loginDto: LoginDto,
     @Req() req: Request,
@@ -124,7 +134,12 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 20, ttl: 600000 } }) // 20 requests per 10 minutes
+  @Throttle({
+    default: {
+      limit: process.env.NODE_ENV === 'test' ? 2000 : 20,
+      ttl: process.env.NODE_ENV === 'test' ? 60000 : 600000
+    }
+  }) // Test: 2000/min, Production: 20/10min
   async refreshToken(
     @Body() refreshTokenDto: RefreshTokenDto,
     @Req() req: Request,

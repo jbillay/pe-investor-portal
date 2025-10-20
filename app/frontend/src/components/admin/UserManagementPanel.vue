@@ -462,18 +462,29 @@ onMounted(async () => {
 // Methods
 const loadUsers = async () => {
   loading.value = true;
-  try {
-    // Fetch users list first
-    const response = await api.get<PaginatedUsersResponseDto>('/admin/users', {
-      params: {
-        page: 1,
-        limit: 100, // Load more users for the admin panel
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        includeProfile: true,
-        includeStats: true,
-      },
-    });
+
+  // Create a timeout promise
+  const timeoutMs = 30000; // 30 seconds timeout
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error('Request timeout - The server is taking too long to respond. This might be due to authentication issues or the backend not responding.'));
+    }, timeoutMs);
+  });
+
+  // Create the actual load promise
+  const loadPromise = (async () => {
+    try {
+      // Fetch users list first
+      const response = await api.get<PaginatedUsersResponseDto>('/admin/users', {
+        params: {
+          page: 1,
+          limit: 100, // Load more users for the admin panel
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          includeProfile: true,
+          includeStats: true,
+        },
+      });
 
     console.log('API Response:', response);
 
@@ -653,30 +664,65 @@ const loadUsers = async () => {
       detail += ` (${failedRoleFetches} users had role fetch issues)`;
     }
 
-    toast.add({
-      severity: failedRoleFetches > 0 ? 'warn' : 'success',
-      summary: 'Users Loaded',
-      detail: detail,
-      life: 3000,
-    });
+      toast.add({
+        severity: failedRoleFetches > 0 ? 'warn' : 'success',
+        summary: 'Users Loaded',
+        detail: detail,
+        life: 3000,
+      });
+    } catch (error) {
+      console.error('Error loading users:', error);
+
+      // More detailed error information
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail:
+          error instanceof Error
+            ? error.message
+            : 'Failed to load users from server',
+        life: 5000,
+      });
+
+      // Set empty array as fallback
+      users.value = [];
+    }
+  })();
+
+  // Race between timeout and actual load
+  try {
+    await Promise.race([loadPromise, timeoutPromise]);
   } catch (error) {
-    console.error('Error loading users:', error);
+    console.error('Load users error or timeout:', error);
 
     // More detailed error information
     if (error instanceof Error) {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
-    }
 
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail:
-        error instanceof Error
-          ? error.message
-          : 'Failed to load users from server',
-      life: 5000,
-    });
+      // Check if it's a timeout error
+      if (error.message.includes('timeout')) {
+        toast.add({
+          severity: 'error',
+          summary: 'Request Timeout',
+          detail: error.message,
+          life: 8000,
+        });
+
+        // Add retry button in a separate toast
+        toast.add({
+          severity: 'info',
+          summary: 'Authentication Issue?',
+          detail: 'If the page keeps timing out, try logging out and logging back in to refresh your session.',
+          life: 10000,
+        });
+      }
+    }
 
     // Set empty array as fallback
     users.value = [];
@@ -934,7 +980,8 @@ const updateUserRole = (userId: string, operation: 'assign' | 'remove', role: an
 
 // Expose methods for parent component access
 defineExpose({
-  updateUserRole
+  updateUserRole,
+  refreshData: loadUsers
 });
 </script>
 

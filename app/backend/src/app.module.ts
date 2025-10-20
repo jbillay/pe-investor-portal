@@ -8,6 +8,7 @@ import { AdminModule } from './admin/admin.module';
 import { EmailModule } from './email/email.module';
 import { InvestmentModule } from './investment/investment.module';
 import { FundModule } from './fund/fund.module';
+import { PluginModule } from './plugin/plugin.module';
 import { HealthController } from './health/health.controller';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
@@ -28,6 +29,7 @@ import { CommonServicesModule } from './common/services/common-services.module';
     EmailModule,
     InvestmentModule,
     FundModule,
+    PluginModule,
   ],
   controllers: [HealthController],
   providers: [

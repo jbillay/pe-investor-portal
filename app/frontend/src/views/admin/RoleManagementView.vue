@@ -107,9 +107,20 @@ const selectedRoleForEdit = ref(null);
 
 // Breadcrumb
 const breadcrumbItems = ref([
-  { label: 'Dashboard', icon: 'pi pi-home', to: '/' },
-  { label: 'Administration', icon: 'pi pi-shield', to: '/admin' },
-  { label: 'Roles', icon: 'pi pi-key' }
+  {
+    label: 'Dashboard',
+    icon: 'pi pi-home',
+    command: () => router.push('/')
+  },
+  {
+    label: 'Administration',
+    icon: 'pi pi-shield',
+    command: () => router.push('/admin')
+  },
+  {
+    label: 'Roles',
+    icon: 'pi pi-key'
+  }
 ]);
 
 // Methods
@@ -243,6 +254,33 @@ onMounted(async () => {
 
 .admin-breadcrumb-nav :deep(.p-breadcrumb-list) {
   color: white;
+}
+
+.admin-breadcrumb-nav :deep(.p-breadcrumb-list li) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.admin-breadcrumb-nav :deep(.p-breadcrumb-list a) {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.admin-breadcrumb-nav :deep(.p-breadcrumb-list a:hover) {
+  background: white;
+  color: #1e40af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.admin-breadcrumb-nav :deep(.p-breadcrumb-list a:hover .p-breadcrumb-item-icon) {
+  color: #1e40af;
 }
 
 .admin-title-section {

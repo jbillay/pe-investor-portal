@@ -46,6 +46,11 @@ const navItems: NavItem[] = [
     label: 'Email Templates',
     icon: 'pi-envelope',
     path: '/admin/email-templates'
+  },
+  {
+    label: 'Plugins',
+    icon: 'pi-box',
+    path: '/admin/plugins'
   }
 ];
 

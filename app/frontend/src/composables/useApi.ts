@@ -54,15 +54,25 @@ class ApiClient {
           return Promise.reject(enhancedError)
         }
 
+        // Handle 429 Rate Limiting - don't retry, just show error
+        if (error.response?.status === 429) {
+          console.warn('Rate limit exceeded, please wait before retrying')
+          const enhancedError = new Error(
+            'Too many requests. Please wait a moment before trying again.'
+          )
+          enhancedError.name = 'RateLimitError'
+          return Promise.reject(enhancedError)
+        }
+
         const originalRequest = error.config
 
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true
 
           // Don't try to refresh if this IS the refresh request - avoid infinite loop
-          if (originalRequest.url?.includes('/auth/refresh')) {
+          if (originalRequest.url?.includes('/auth/refresh') || originalRequest.url?.includes('/auth/login')) {
             const authStore = useAuthStore()
-            authStore.logout()
+            await authStore.logout()
             window.location.href = '/login'
             return Promise.reject(error)
           }
@@ -78,6 +88,13 @@ class ApiClient {
               })
               .catch((refreshError) => {
                 this.refreshTokenPromise = null
+                // Check if it's a cooldown error - if so, don't logout
+                if (refreshError?.message?.includes('cooldown')) {
+                  console.warn('Refresh cooldown active, request will be retried later')
+                  throw refreshError
+                }
+                // For other refresh errors (invalid token, max retries), logout
+                console.error('Token refresh failed, logging out')
                 authStore.logout()
                 window.location.href = '/login'
                 throw refreshError
@@ -90,7 +107,11 @@ class ApiClient {
               originalRequest.headers.Authorization = `Bearer ${newToken}`
               return this.instance(originalRequest)
             }
-          } catch (refreshError) {
+          } catch (refreshError: any) {
+            // If it's a cooldown error, return the original 401 to the caller
+            if (refreshError?.message?.includes('cooldown')) {
+              return Promise.reject(error)
+            }
             return Promise.reject(refreshError)
           }
         }

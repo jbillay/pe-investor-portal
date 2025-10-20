@@ -30,6 +30,8 @@ import ConfirmDialog from 'primevue/confirmdialog'
 
 import App from './App.vue'
 import router from './router'
+import { useAuthStore } from '@/stores/auth'
+import { usePluginRegistryStore } from '@/stores/pluginRegistry'
 
 import 'primeicons/primeicons.css'
 import './assets/main.css'
@@ -77,3 +79,24 @@ app.component('ConfirmDialog', ConfirmDialog)
 app.directive('tooltip', Tooltip)
 
 app.mount('#app')
+
+// Initialize authentication and plugin system after app is mounted
+;(async () => {
+  const authStore = useAuthStore()
+  const pluginRegistryStore = usePluginRegistryStore()
+
+  // Initialize auth from localStorage
+  authStore.initializeAuth()
+
+  // Initialize plugin system if user is authenticated
+  if (authStore.isAuthenticated) {
+    try {
+      console.log('Initializing plugin system...')
+      await pluginRegistryStore.initialize()
+      console.log('Plugin system initialized successfully')
+    } catch (error) {
+      console.error('Failed to initialize plugin system:', error)
+      // Continue app startup even if plugin initialization fails
+    }
+  }
+})()

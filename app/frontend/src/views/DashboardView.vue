@@ -25,6 +25,21 @@
       </div>
     </div>
 
+    <!-- Plugin Widgets: Dashboard Top -->
+    <div v-if="dashboardTopWidgets.length > 0" class="space-y-4">
+      <div
+        v-for="widget in dashboardTopWidgets"
+        :key="widget.id"
+        class="plugin-widget"
+      >
+        <component
+          :is="getWidgetComponent(widget)"
+          v-if="getWidgetComponent(widget)"
+          v-bind="widget.props || {}"
+        />
+      </div>
+    </div>
+
     <!-- Portfolio Summary Stats -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <div class="bg-white rounded-lg shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
@@ -86,6 +101,19 @@
             </p>
           </div>
         </div>
+      </div>
+
+      <!-- Plugin Widgets: Dashboard Stats -->
+      <div
+        v-for="widget in dashboardStatsWidgets"
+        :key="widget.id"
+        class="plugin-widget"
+      >
+        <component
+          :is="getWidgetComponent(widget)"
+          v-if="getWidgetComponent(widget)"
+          v-bind="widget.props || {}"
+        />
       </div>
     </div>
 
@@ -187,6 +215,34 @@
           </div>
         </div>
       </div>
+
+      <!-- Plugin Widgets: Dashboard Sidebar -->
+      <div
+        v-for="widget in dashboardSidebarWidgets"
+        :key="widget.id"
+        class="plugin-widget lg:col-span-1"
+      >
+        <component
+          :is="getWidgetComponent(widget)"
+          v-if="getWidgetComponent(widget)"
+          v-bind="widget.props || {}"
+        />
+      </div>
+    </div>
+
+    <!-- Plugin Widgets: Dashboard Main -->
+    <div v-if="dashboardMainWidgets.length > 0" class="space-y-6">
+      <div
+        v-for="widget in dashboardMainWidgets"
+        :key="widget.id"
+        class="plugin-widget"
+      >
+        <component
+          :is="getWidgetComponent(widget)"
+          v-if="getWidgetComponent(widget)"
+          v-bind="widget.props || {}"
+        />
+      </div>
     </div>
 
     <!-- Recent Alerts -->
@@ -263,6 +319,21 @@
       </div>
     </div>
 
+    <!-- Plugin Widgets: Dashboard Bottom -->
+    <div v-if="dashboardBottomWidgets.length > 0" class="space-y-6">
+      <div
+        v-for="widget in dashboardBottomWidgets"
+        :key="widget.id"
+        class="plugin-widget"
+      >
+        <component
+          :is="getWidgetComponent(widget)"
+          v-if="getWidgetComponent(widget)"
+          v-bind="widget.props || {}"
+        />
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -270,12 +341,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@stores/auth'
+import { usePluginRegistryStore } from '@stores/pluginRegistry'
 import { MockInvestmentApiService } from '../services/mockData'
 import type { InvestmentSummary, Investment } from '../types/investment'
+import type { PluginWidget } from '../types/plugin'
 import AlertsPanel from '../components/communications/AlertsPanel.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const pluginRegistryStore = usePluginRegistryStore()
 
 // Reactive data
 const isLoading = ref(true)
@@ -283,6 +357,19 @@ const summary = ref<InvestmentSummary | null>(null)
 const recentActivities = ref<any[]>([])
 const portfolioHoldings = ref<Investment[]>([])
 const pendingActions = ref<any[]>([])
+
+// Plugin widgets by slot
+const getWidgetsBySlot = (slotName: string): PluginWidget[] => {
+  return pluginRegistryStore.allWidgets.filter(
+    (widget) => widget.slot === slotName
+  )
+}
+
+const dashboardTopWidgets = computed(() => getWidgetsBySlot('dashboard-top'))
+const dashboardStatsWidgets = computed(() => getWidgetsBySlot('dashboard-stats'))
+const dashboardMainWidgets = computed(() => getWidgetsBySlot('dashboard-main'))
+const dashboardSidebarWidgets = computed(() => getWidgetsBySlot('dashboard-sidebar'))
+const dashboardBottomWidgets = computed(() => getWidgetsBySlot('dashboard-bottom'))
 
 // Computed properties
 const currentDate = computed(() => {
@@ -429,6 +516,33 @@ const getActionButtonText = (type: string): string => {
       return 'Submit'
     default:
       return 'View'
+  }
+}
+
+// Plugin widget helpers
+const getWidgetComponent = (widget: PluginWidget): any => {
+  try {
+    const loadedPlugin = pluginRegistryStore.loadedPlugins.get(widget.pluginId)
+    if (!loadedPlugin || !loadedPlugin.module) {
+      console.warn(`Plugin ${widget.pluginId} not loaded`)
+      return null
+    }
+
+    // Widget can be accessed via named export or from widgets object
+    if (widget.component && loadedPlugin.module[widget.component]) {
+      return loadedPlugin.module[widget.component]
+    }
+
+    // Or check if module exports widgets object
+    if (loadedPlugin.module.widgets && loadedPlugin.module.widgets[widget.id]) {
+      return loadedPlugin.module.widgets[widget.id]
+    }
+
+    console.warn(`Widget component ${widget.component} not found in plugin ${widget.pluginId}`)
+    return null
+  } catch (error) {
+    console.error(`Error loading widget ${widget.id}:`, error)
+    return null
   }
 }
 

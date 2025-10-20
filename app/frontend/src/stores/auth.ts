@@ -19,6 +19,13 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  // Token refresh management
+  let refreshPromise: Promise<void> | null = null;
+  let lastRefreshAttempt: number = 0;
+  const REFRESH_COOLDOWN = 5000; // 5 seconds between refresh attempts
+  let refreshRetryCount = 0;
+  const MAX_REFRESH_RETRIES = 3;
+
   // Getters
   const isAuthenticated = computed(() => !!user.value && !!accessToken.value);
   const userInitials = computed(() => {
@@ -207,38 +214,84 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function refreshTokens(): Promise<void> {
+    // If refresh already in progress, return existing promise
+    if (refreshPromise) {
+      console.log('Refresh already in progress, waiting...');
+      return refreshPromise;
+    }
+
     if (!refreshToken.value) {
       throw new Error('No refresh token available');
     }
 
-    console.log('In refreshToken', refreshToken.value)
-    try {
-      console.log('Query /auth/refresh');
-      const response = await apiClient.post<RefreshTokenResponse>(
-        '/auth/refresh',
-        {
-          refreshToken: refreshToken.value,
-        },
-      );
-
-      console.log('Response from refresh token', response);
-
-      if (response.status === 'success' && response.data) {
-        const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
-          response.data;
-
-        accessToken.value = newAccessToken;
-        refreshToken.value = newRefreshToken;
-
-        localStorage.setItem('accessToken', newAccessToken);
-        localStorage.setItem('refreshToken', newRefreshToken);
-      }
-    } catch (err) {
-      console.log('Response from refresh token failed', err);
-      // If refresh fails, clear all auth data
-      await logout();
-      throw err;
+    // Check cooldown period
+    const now = Date.now();
+    if (now - lastRefreshAttempt < REFRESH_COOLDOWN) {
+      const waitTime = Math.ceil((REFRESH_COOLDOWN - (now - lastRefreshAttempt)) / 1000);
+      console.warn(`Refresh cooldown active. Please wait ${waitTime} seconds`);
+      throw new Error('Refresh cooldown active');
     }
+
+    // Check retry limit
+    if (refreshRetryCount >= MAX_REFRESH_RETRIES) {
+      console.error('Max refresh retries exceeded, logging out');
+      await logout();
+      throw new Error('Max refresh retries exceeded');
+    }
+
+    lastRefreshAttempt = now;
+    refreshRetryCount++;
+
+    refreshPromise = (async () => {
+      try {
+        console.log(`Refreshing tokens (attempt ${refreshRetryCount}/${MAX_REFRESH_RETRIES})...`);
+
+        const response = await apiClient.post<RefreshTokenResponse>(
+          '/auth/refresh',
+          { refreshToken: refreshToken.value },
+        );
+
+        console.log('Response from refresh token', response);
+
+        if (response.status === 'success' && response.data) {
+          const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data;
+
+          accessToken.value = newAccessToken;
+          refreshToken.value = newRefreshToken;
+
+          localStorage.setItem('accessToken', newAccessToken);
+          localStorage.setItem('refreshToken', newRefreshToken);
+
+          // Reset retry count on success
+          refreshRetryCount = 0;
+          console.log('Token refresh successful');
+        }
+      } catch (err: any) {
+        console.error('Token refresh failed:', err);
+
+        // Handle specific error codes
+        if (err.response?.status === 429) {
+          console.warn('Rate limited - waiting before retry');
+          // Don't logout on rate limit, just fail this attempt
+        } else if (err.response?.status === 401 || err.response?.status === 403) {
+          console.error('Refresh token invalid, logging out');
+          refreshRetryCount = MAX_REFRESH_RETRIES; // Force max retries
+          await logout();
+        } else {
+          // Other errors - logout if max retries exceeded
+          if (refreshRetryCount >= MAX_REFRESH_RETRIES) {
+            console.error('Max retries exceeded, logging out');
+            await logout();
+          }
+        }
+
+        throw err;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+
+    return refreshPromise;
   }
 
   async function getCurrentUser(): Promise<void> {

@@ -31,10 +31,12 @@ model User {
   updatedAt             DateTime  @updatedAt
 
   // Relations
-  sessions    Session[]
-  profile     UserProfile?
-  userRoles   UserRole[]
-  investments Investment[]
+  sessions            Session[]
+  profile             UserProfile?
+  userRoles           UserRole[]
+  investments         Investment[]
+  pluginsInstalled    Plugin[]     @relation("PluginInstalledBy")
+  pluginsUninstalled  Plugin[]     @relation("PluginUninstalledBy")
 
   @@map("users")
 }
@@ -529,4 +531,45 @@ model EmailQueue {
   @@index([priority])
   @@index([recipientEmail])
   @@map("email_queue")
+}
+
+// Plugin model for plugin system
+model Plugin {
+  id              String       @id @default(cuid())
+  pluginId        String       @unique // Unique plugin identifier from manifest
+  name            String       // Plugin name
+  version         String       // Semver version
+  author          String       // Plugin author
+  authorEmail     String?      // Author email
+  description     String?      // Plugin description
+  icon            String?      // Icon path
+  license         String?      // License type
+  status          PluginStatus @default(UPLOADED) // Current plugin status
+  manifest        Json         // Full manifest JSON
+  filePath        String       // Path to extracted plugin files
+  zipPath         String?      // Path to original ZIP file
+  installedAt     DateTime?    // When plugin was installed
+  installedBy     String?      // User ID who installed
+  uninstalledAt   DateTime?    // When plugin was uninstalled
+  uninstalledBy   String?      // User ID who uninstalled
+  errorMessage    String?      // Error message if installation failed
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  installedByUser     User? @relation("PluginInstalledBy", fields: [installedBy], references: [id], onDelete: SetNull)
+  uninstalledByUser   User? @relation("PluginUninstalledBy", fields: [uninstalledBy], references: [id], onDelete: SetNull)
+
+  @@index([pluginId])
+  @@index([status])
+  @@index([installedBy])
+  @@map("plugins")
+}
+
+// Plugin status enum
+enum PluginStatus {
+  UPLOADED      // Uploaded but not installed
+  INSTALLED     // Successfully installed and active
+  FAILED        // Installation failed
+  UNINSTALLED   // Uninstalled but files kept
 }
