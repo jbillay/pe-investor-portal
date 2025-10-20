@@ -51,18 +51,20 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
       },
     },
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox'],
-      },
-    },
-    {
-      name: 'webkit',
-      use: {
-        ...devices['Desktop Safari'],
-      },
-    },
+    // Firefox and WebKit disabled for development - enable only when needed
+    // Uncomment to test cross-browser compatibility
+    // {
+    //   name: 'firefox',
+    //   use: {
+    //     ...devices['Desktop Firefox'],
+    //   },
+    // },
+    // {
+    //   name: 'webkit',
+    //   use: {
+    //     ...devices['Desktop Safari'],
+    //   },
+    // },
 
     /* Test against mobile viewports. */
     // {

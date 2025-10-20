@@ -61,7 +61,7 @@ class ApiClient {
             'Too many requests. Please wait a moment before trying again.'
           )
           enhancedError.name = 'RateLimitError'
-          return Promise.reject(enhancedError)
+          return Promise.reject(error)
         }
 
         const originalRequest = error.config
@@ -69,8 +69,14 @@ class ApiClient {
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true
 
+          // For login requests, just return the error - don't logout or reload
+          // The login page will handle displaying the error message
+          if (originalRequest.url?.includes('/auth/login')) {
+            return Promise.reject(error)
+          }
+
           // Don't try to refresh if this IS the refresh request - avoid infinite loop
-          if (originalRequest.url?.includes('/auth/refresh') || originalRequest.url?.includes('/auth/login')) {
+          if (originalRequest.url?.includes('/auth/refresh')) {
             const authStore = useAuthStore()
             await authStore.logout()
             window.location.href = '/login'

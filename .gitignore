@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # Playwright
 .Playwright-mcp/
+
+test-logs
+test-logs/*
