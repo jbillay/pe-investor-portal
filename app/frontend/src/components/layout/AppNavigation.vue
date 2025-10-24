@@ -26,8 +26,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { usePluginRegistryStore } from '@/stores/pluginRegistry'
 
 const authStore = useAuthStore()
+const pluginRegistryStore = usePluginRegistryStore()
 
 const navigationItems = computed(() => {
   const baseItems = [
@@ -73,6 +75,17 @@ const navigationItems = computed(() => {
       to: '/admin'
     })
   }
+
+  // Add plugin menus (type='main' menus only)
+  const pluginMenus = pluginRegistryStore.mainMenuItems
+  pluginMenus.forEach(menu => {
+    baseItems.push({
+      name: menu.route.replace('/', '') || menu.id,
+      label: menu.label,
+      icon: menu.icon || 'pi pi-puzzle-piece',
+      to: menu.route
+    })
+  })
 
   return baseItems
 })

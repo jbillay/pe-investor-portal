@@ -17,6 +17,7 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = ref<string | null>(localStorage.getItem('refreshToken'));
   const requiresPasswordChange = ref<boolean>(localStorage.getItem('requiresPasswordChange') === 'true');
   const isLoading = ref(false);
+  const isRefreshing = ref(false);
   const error = ref<string | null>(null);
 
   // Token refresh management
@@ -241,6 +242,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     lastRefreshAttempt = now;
     refreshRetryCount++;
+    isRefreshing.value = true;
 
     refreshPromise = (async () => {
       try {
@@ -253,30 +255,60 @@ export const useAuthStore = defineStore('auth', () => {
 
         console.log('Response from refresh token', response);
 
+        // Backend returns tokens directly in the response (not wrapped in response.data)
+        // Check for both wrapped and direct formats for compatibility
+        let newAccessToken: string;
+        let newRefreshToken: string;
+
         if (response.status === 'success' && response.data) {
-          const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data;
-
-          accessToken.value = newAccessToken;
-          refreshToken.value = newRefreshToken;
-
-          localStorage.setItem('accessToken', newAccessToken);
-          localStorage.setItem('refreshToken', newRefreshToken);
-
-          // Reset retry count on success
-          refreshRetryCount = 0;
-          console.log('Token refresh successful');
+          // Wrapped format: { status: 'success', data: { accessToken, refreshToken } }
+          newAccessToken = response.data.accessToken;
+          newRefreshToken = response.data.refreshToken;
+        } else if ((response as any).accessToken && (response as any).refreshToken) {
+          // Direct format: { accessToken, refreshToken, user }
+          newAccessToken = (response as any).accessToken;
+          newRefreshToken = (response as any).refreshToken;
+        } else {
+          throw new Error('Invalid refresh token response format');
         }
+
+        accessToken.value = newAccessToken;
+        refreshToken.value = newRefreshToken;
+
+        localStorage.setItem('accessToken', newAccessToken);
+        localStorage.setItem('refreshToken', newRefreshToken);
+
+        // Reset retry count on success
+        refreshRetryCount = 0;
+        console.log('Token refresh successful');
+
       } catch (err: any) {
         console.error('Token refresh failed:', err);
 
+        // Handle timeout errors - logout immediately, don't retry
+        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+          console.error('Refresh timeout - backend not responding, logging out');
+          refreshRetryCount = MAX_REFRESH_RETRIES; // Force max retries
+          // Clear tokens immediately
+          accessToken.value = null;
+          refreshToken.value = null;
+          await logout();
+        }
         // Handle specific error codes
-        if (err.response?.status === 429) {
+        else if (err.response?.status === 429) {
           console.warn('Rate limited - waiting before retry');
           // Don't logout on rate limit, just fail this attempt
         } else if (err.response?.status === 401 || err.response?.status === 403) {
-          console.error('Refresh token invalid, logging out');
+          console.error('Refresh token invalid or expired, logging out');
           refreshRetryCount = MAX_REFRESH_RETRIES; // Force max retries
-          await logout();
+          // Clear tokens immediately to prevent logout API call
+          accessToken.value = null;
+          refreshToken.value = null;
+          // Don't await logout - just clear and let interceptor redirect
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          localStorage.removeItem('requiresPasswordChange');
         } else {
           // Other errors - logout if max retries exceeded
           if (refreshRetryCount >= MAX_REFRESH_RETRIES) {
@@ -287,6 +319,7 @@ export const useAuthStore = defineStore('auth', () => {
 
         throw err;
       } finally {
+        isRefreshing.value = false;
         refreshPromise = null;
       }
     })();
@@ -535,6 +568,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken,
     requiresPasswordChange,
     isLoading,
+    isRefreshing,
     error,
 
     // Getters
