@@ -15,15 +15,11 @@
             @click="refreshPlugins"
             :loading="loading"
           />
-          <FileUpload
-            mode="basic"
-            accept=".zip"
-            :maxFileSize="10000000"
-            :customUpload="true"
-            @uploader="handlePluginUpload"
-            chooseLabel="Upload Plugin"
-            chooseIcon="pi pi-upload"
+          <Button
+            label="Install Plugin"
+            icon="pi pi-download"
             class="p-button-primary"
+            @click="openInstallDialog"
           />
         </div>
       </div>
@@ -427,6 +423,12 @@
         />
       </template>
     </Dialog>
+
+    <!-- Plugin Install Dialog -->
+    <PluginInstallDialog
+      v-model:visible="installDialogVisible"
+      @plugin-installed="handlePluginInstalled"
+    />
   </div>
 </template>
 
@@ -437,7 +439,6 @@ import { useConfirm } from 'primevue/useconfirm';
 import { pluginApiService } from '@/services/pluginApiService';
 import { usePluginRegistryStore } from '@/stores/pluginRegistry';
 import type { Plugin, PluginStatus, PluginStatistics } from '@/types/plugin';
-import type { FileUploadUploaderEvent } from 'primevue/fileupload';
 
 // PrimeVue Components
 import Button from 'primevue/button';
@@ -448,8 +449,10 @@ import Column from 'primevue/column';
 import Tag from 'primevue/tag';
 import Card from 'primevue/card';
 import Dialog from 'primevue/dialog';
-import FileUpload from 'primevue/fileupload';
 import ProgressSpinner from 'primevue/progressspinner';
+
+// Custom Components
+import PluginInstallDialog from './PluginInstallDialog.vue';
 
 /**
  * PluginManager Component
@@ -474,6 +477,7 @@ const statistics = ref<PluginStatistics>({
 });
 
 const pluginDetailsDialogVisible = ref(false);
+const installDialogVisible = ref(false);
 const selectedPlugin = ref<Plugin | null>(null);
 const actionLoading = reactive<Record<string, boolean>>({});
 
@@ -564,49 +568,13 @@ const viewPluginDetails = (plugin: Plugin) => {
 };
 
 // Plugin Actions
-const handlePluginUpload = async (event: FileUploadUploaderEvent) => {
-  const file = event.files[0];
+const openInstallDialog = () => {
+  installDialogVisible.value = true;
+};
 
-  if (!file) {
-    return;
-  }
-
-  try {
-    loading.value = true;
-
-    const response = await pluginApiService.uploadPlugin(file);
-
-    toast.add({
-      severity: 'success',
-      summary: 'Plugin Uploaded',
-      detail: response.message,
-      life: 3000
-    });
-
-    // Show warnings if any
-    if (response.warnings && response.warnings.length > 0) {
-      response.warnings.forEach(warning => {
-        toast.add({
-          severity: 'warn',
-          summary: 'Warning',
-          detail: warning,
-          life: 5000
-        });
-      });
-    }
-
-    // Refresh plugin list
-    await fetchPlugins();
-  } catch (error: any) {
-    toast.add({
-      severity: 'error',
-      summary: 'Upload Failed',
-      detail: error.message || 'Failed to upload plugin',
-      life: 5000
-    });
-  } finally {
-    loading.value = false;
-  }
+const handlePluginInstalled = async () => {
+  // Refresh plugin list and statistics after installation
+  await fetchPlugins();
 };
 
 const installPlugin = async (plugin: Plugin) => {

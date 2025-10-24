@@ -71,7 +71,12 @@ export const usePluginRegistryStore = defineStore('pluginRegistry', () => {
 
     installedPlugins.value.forEach(plugin => {
       if (plugin.status === 'INSTALLED' && plugin.manifest.widgets) {
-        widgets.push(...plugin.manifest.widgets);
+        // Add pluginId to each widget so we can load the component later
+        const widgetsWithPluginId = plugin.manifest.widgets.map(widget => ({
+          ...widget,
+          pluginId: plugin.pluginId
+        }));
+        widgets.push(...widgetsWithPluginId);
       }
     });
 
@@ -95,6 +100,18 @@ export const usePluginRegistryStore = defineStore('pluginRegistry', () => {
   const isPluginLoaded = (pluginId: string): boolean => {
     return loadedPlugins.value.has(pluginId);
   };
+
+  const getPluginIdByRoute = (route: string): string | undefined => {
+    for (const plugin of installedPlugins.value) {
+      if (plugin.status === 'INSTALLED' && plugin.manifest.menus) {
+        const menu = plugin.manifest.menus.find(m => m.route === route);
+        if (menu) {
+          return plugin.pluginId;
+        }
+      }
+    }
+    return undefined;
+  };;
 
   // Actions - Fetch Plugins
   async function fetchInstalledPlugins(): Promise<void> {
@@ -312,6 +329,7 @@ export const usePluginRegistryStore = defineStore('pluginRegistry', () => {
     getPluginById,
     getLoadedPlugin,
     isPluginLoaded,
+    getPluginIdByRoute,
 
     // Actions - Fetching
     fetchInstalledPlugins,

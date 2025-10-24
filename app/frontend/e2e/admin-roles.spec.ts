@@ -126,8 +126,8 @@ test.describe('Admin - Role Management', () => {
 
       // Check for dialog content (form fields)
       // Common fields: Role Name, Description, Permissions
-      const dialogVisible = await page.locator('.p-dialog, [role="dialog"]').isVisible()
-      expect(dialogVisible).toBeTruthy()
+      const dialogVisible = page.locator('.p-dialog, [role="dialog"]')
+      await expect(dialogVisible).toBeVisible()
     })
 
     test('should close create role dialog on cancel', async ({ authenticatedPage: page }) => {
@@ -144,8 +144,8 @@ test.describe('Admin - Role Management', () => {
 
         // Dialog should close
         await page.waitForTimeout(300)
-        const dialogVisible = await page.locator('.p-dialog-mask').isVisible()
-        expect(dialogVisible).toBe(false)
+        const dialogVisible = page.locator('.p-dialog-mask')
+        await expect(dialogVisible).toBeHidden()
       }
     })
 
@@ -223,8 +223,8 @@ test.describe('Admin - Role Management', () => {
 
         // Edit dialog should open
         await page.waitForTimeout(500)
-        const dialogVisible = await page.locator('.p-dialog, [role="dialog"]').isVisible()
-        expect(dialogVisible).toBeTruthy()
+        const dialogVisible = page.locator('.p-dialog, [role="dialog"]')
+        await expect(dialogVisible).toBeVisible()
       }
     })
 
@@ -288,8 +288,8 @@ test.describe('Admin - Role Management', () => {
 
         if (await deleteButton.count() > 0) {
           // If delete button exists, it should be disabled
-          const isDisabled = await deleteButton.isDisabled()
-          expect(isDisabled).toBe(true)
+          const isDisabled = deleteButton
+          await expect(isDisabled).toBeDisabled()
         }
       }
     })
@@ -308,8 +308,8 @@ test.describe('Admin - Role Management', () => {
 
         // Permission dialog should open
         await page.waitForTimeout(500)
-        const dialogVisible = await page.locator('.p-dialog, [role="dialog"]').isVisible()
-        expect(dialogVisible).toBeTruthy()
+        const dialogVisible = page.locator('.p-dialog, [role="dialog"]')
+        await expect(dialogVisible).toBeVisible()
       }
     })
 
@@ -375,7 +375,7 @@ test.describe('Admin - Role Management', () => {
         await page.waitForTimeout(500)
 
         // Results should be filtered
-        expect(await searchInput.inputValue()).toBe('ADMIN')
+        await expect(searchInput).toHaveValue('ADMIN')
       }
     })
   })
