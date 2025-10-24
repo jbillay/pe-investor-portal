@@ -5,12 +5,28 @@
  */
 
 import { computed, readonly, type ComputedRef } from 'vue';
-import { useRouter, type Router } from 'vue-router';
-import { useToast, type ToastServiceMethods } from 'primevue/usetoast';
+import { type Router } from 'vue-router';
+import { type ToastServiceMethods } from 'primevue/usetoast';
 import { useAuthStore } from '@/stores/auth';
 import { usePluginRegistryStore } from '@/stores/pluginRegistry';
 import type { User } from '@/types/auth';
 import type { PluginManifest } from '@/types/plugin';
+
+/**
+ * Global plugin context providers
+ * These are set during app initialization
+ */
+let globalRouter: Router | null = null;
+let globalToast: ToastServiceMethods | null = null;
+
+/**
+ * Set global providers for plugin context
+ * Called during app initialization
+ */
+export function setPluginContextProviders(router: Router, toast: ToastServiceMethods): void {
+  globalRouter = router;
+  globalToast = toast;
+}
 
 /**
  * Plugin Context API interface
@@ -121,8 +137,16 @@ function getStorageKey(pluginId: string, key: string): string {
  * This is the main function plugins will call to get their context
  */
 export function usePluginContext(pluginId: string): PluginContext {
-  const router = useRouter();
-  const toast = useToast();
+  // Use global providers instead of inject-based composables
+  if (!globalRouter) {
+    throw new Error('Plugin context not initialized - router not available');
+  }
+  if (!globalToast) {
+    throw new Error('Plugin context not initialized - toast service not available');
+  }
+
+  const router = globalRouter;
+  const toast = globalToast;
   const authStore = useAuthStore();
   const pluginRegistryStore = usePluginRegistryStore();
 

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@stores/auth'
+import { usePluginRegistryStore } from '@stores/pluginRegistry'
 
 // Route definitions
 const routes: RouteRecordRaw[] = [
@@ -123,6 +124,12 @@ const routes: RouteRecordRaw[] = [
           title: 'Plugin Management',
           requiresRole: 'SUPER_ADMIN'
         }
+      },
+      {
+        path: 'plugins/:pluginId',
+        name: 'plugin-view',
+        component: () => import('@views/PluginView.vue'),
+        meta: { title: 'Plugin' }
       }
     ]
   },
@@ -144,9 +151,13 @@ const router = createRouter({
   }
 })
 
+// Track if plugin system has been initialized
+let pluginSystemInitialized = false
+
 // Navigation guards
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+  const pluginRegistryStore = usePluginRegistryStore()
 
   // Set page title
   if (to.meta.title) {
@@ -220,6 +231,19 @@ router.beforeEach(async (to, from, next) => {
     if (authStore.isAuthenticated && to.name === 'login') {
       next({ name: 'dashboard' })
       return
+    }
+  }
+
+  // Initialize plugin system once after authentication is confirmed
+  if (authStore.isAuthenticated && !pluginSystemInitialized) {
+    try {
+      console.log('Initializing plugin system after authentication...')
+      await pluginRegistryStore.initialize()
+      pluginSystemInitialized = true
+      console.log('Plugin system initialized successfully')
+    } catch (error) {
+      console.error('Failed to initialize plugin system:', error)
+      // Continue navigation even if plugin initialization fails
     }
   }
 

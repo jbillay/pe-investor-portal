@@ -1,10 +1,23 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import * as Vue from 'vue'
 import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
 import Tooltip from 'primevue/tooltip'
+import { usePluginContext, setPluginContextProviders } from '@/composables/usePluginContext'
+
+// Expose Vue and Plugin Context to plugins via window object
+declare global {
+  interface Window {
+    Vue: typeof Vue
+    usePluginContext: typeof usePluginContext
+    __toast: any
+  }
+}
+window.Vue = Vue
+window.usePluginContext = usePluginContext
 
 // PrimeVue Components
 import Button from 'primevue/button'
@@ -78,25 +91,37 @@ app.component('ConfirmDialog', ConfirmDialog)
 // Register PrimeVue directives
 app.directive('tooltip', Tooltip)
 
-app.mount('#app')
+const mountedApp = app.mount('#app')
 
-// Initialize authentication and plugin system after app is mounted
-;(async () => {
-  const authStore = useAuthStore()
-  const pluginRegistryStore = usePluginRegistryStore()
-
-  // Initialize auth from localStorage
-  authStore.initializeAuth()
-
-  // Initialize plugin system if user is authenticated
-  if (authStore.isAuthenticated) {
-    try {
-      console.log('Initializing plugin system...')
-      await pluginRegistryStore.initialize()
-      console.log('Plugin system initialized successfully')
-    } catch (error) {
-      console.error('Failed to initialize plugin system:', error)
-      // Continue app startup even if plugin initialization fails
+// Initialize plugin context providers
+// Create a toast service wrapper that doesn't require inject
+const toastService = {
+  add: (options: any) => {
+    // Use PrimeVue's toast event bus
+    if (window.__toast) {
+      window.__toast.add(options)
+    } else {
+      // Fallback to console if toast not available
+      console.log(`[Toast ${options.severity}]:`, options.summary, options.detail)
+    }
+  },
+  removeGroup: (group: string) => {
+    if (window.__toast) {
+      window.__toast.removeGroup(group)
+    }
+  },
+  removeAllGroups: () => {
+    if (window.__toast) {
+      window.__toast.removeAllGroups()
     }
   }
+}
+
+setPluginContextProviders(router, toastService)
+
+// Initialize authentication after app is mounted
+;(async () => {
+  const authStore = useAuthStore()
+  // Initialize auth from localStorage
+  authStore.initializeAuth()
 })()

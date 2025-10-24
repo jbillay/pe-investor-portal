@@ -66,10 +66,10 @@ describe('AdminNavigation', () => {
       expect(wrapper.find('.admin-nav-tabs').exists()).toBe(true)
     })
 
-    it('should render all four navigation items', async () => {
+    it('should render all five navigation items', async () => {
       wrapper = await createWrapper()
       const navButtons = wrapper.findAll('.admin-nav-tab')
-      expect(navButtons).toHaveLength(4)
+      expect(navButtons).toHaveLength(5)
     })
 
     it('should render navigation items in correct order', async () => {
@@ -116,6 +116,15 @@ describe('AdminNavigation', () => {
       expect(emailTab.text()).toContain('Email Templates')
     })
 
+
+    it('should render Plugin tab with correct icon and label', async () => {
+      wrapper = await createWrapper()
+      const pluginTab = wrapper.findAll('.admin-nav-tab')[4]
+
+      expect(pluginTab.find('i.pi-box').exists()).toBe(true)
+      expect(pluginTab.text()).toContain('Plugins')
+    })
+
     it('should render icons with correct PrimeIcons classes', async () => {
       wrapper = await createWrapper()
       const icons = wrapper.findAll('.admin-nav-tab i')
@@ -128,6 +137,8 @@ describe('AdminNavigation', () => {
       expect(icons[2].classes()).toContain('pi-chart-bar')
       expect(icons[3].classes()).toContain('pi')
       expect(icons[3].classes()).toContain('pi-envelope')
+      expect(icons[4].classes()).toContain('pi')
+      expect(icons[4].classes()).toContain('pi-box')
     })
   })
 
@@ -156,6 +167,13 @@ describe('AdminNavigation', () => {
     it('should mark Email Templates tab as active when on /admin/email-templates route', async () => {
       wrapper = await createWrapper('/admin/email-templates')
       const emailTab = wrapper.findAll('.admin-nav-tab')[3]
+
+      expect(emailTab.classes()).toContain('active')
+    })
+
+    it('should mark Plugins tab as active when on /admin/plugins route', async () => {
+      wrapper = await createWrapper('/admin/plugins')
+      const emailTab = wrapper.findAll('.admin-nav-tab')[4]
 
       expect(emailTab.classes()).toContain('active')
     })
@@ -236,6 +254,16 @@ describe('AdminNavigation', () => {
       expect(pushSpy).toHaveBeenCalledWith('/admin/email-templates')
     })
 
+    it('should navigate to PLugins page when Plugins tab is clicked', async () => {
+      wrapper = await createWrapper('/admin/plugins')
+      pushSpy = vi.spyOn(router, 'push')
+
+      const emailTab = wrapper.findAll('.admin-nav-tab')[4]
+      await emailTab.trigger('click')
+
+      expect(pushSpy).toHaveBeenCalledWith('/admin/plugins')
+    })
+
     it('should call router.push exactly once per click', async () => {
       wrapper = await createWrapper('/admin/users')
       pushSpy = vi.spyOn(router, 'push')
@@ -314,7 +342,7 @@ describe('AdminNavigation', () => {
       wrapper = await createWrapper()
       const buttons = wrapper.findAll('button')
 
-      expect(buttons).toHaveLength(4)
+      expect(buttons).toHaveLength(5)
     })
 
     it('should have clickable buttons with proper cursor', async () => {
@@ -340,11 +368,12 @@ describe('AdminNavigation', () => {
       wrapper = await createWrapper()
       const labels = wrapper.findAll('.admin-nav-tab span')
 
-      expect(labels).toHaveLength(4)
+      expect(labels).toHaveLength(5)
       expect(labels[0].text()).toBe('Users')
       expect(labels[1].text()).toBe('Roles')
       expect(labels[2].text()).toBe('Analytics')
       expect(labels[3].text()).toBe('Email Templates')
+      expect(labels[4].text()).toBe('Plugins')
     })
   })
 
@@ -355,7 +384,7 @@ describe('AdminNavigation', () => {
 
       expect(vm.navItems).toBeDefined()
       expect(Array.isArray(vm.navItems)).toBe(true)
-      expect(vm.navItems).toHaveLength(4)
+      expect(vm.navItems).toHaveLength(5)
     })
 
     it('should have Users item with correct properties', async () => {
@@ -397,6 +426,16 @@ describe('AdminNavigation', () => {
       expect(emailItem.icon).toBe('pi-envelope')
       expect(emailItem.path).toBe('/admin/email-templates')
     })
+
+    it('should have Plugins item with correct properties', async () => {
+      wrapper = await createWrapper()
+      const vm = wrapper.vm
+      const emailItem = vm.navItems[4]
+
+      expect(emailItem.label).toBe('Plugins')
+      expect(emailItem.icon).toBe('pi-box')
+      expect(emailItem.path).toBe('/admin/plugins')
+    })
   })
 
   describe('Component Methods', () => {
@@ -424,6 +463,7 @@ describe('AdminNavigation', () => {
       expect(vm.isActive('/admin/roles')).toBe(false)
       expect(vm.isActive('/admin/analytics')).toBe(false)
       expect(vm.isActive('/admin/email-templates')).toBe(false)
+      expect(vm.isActive('/admin/plugins')).toBe(false)
     })
 
     it('should return correct boolean from isActive based on current route', async () => {
@@ -434,6 +474,7 @@ describe('AdminNavigation', () => {
       expect(vm.isActive('/admin/roles')).toBe(false)
       expect(vm.isActive('/admin/analytics')).toBe(true)
       expect(vm.isActive('/admin/email-templates')).toBe(false)
+      expect(vm.isActive('/admin/plugins')).toBe(false)
     })
   })
 
@@ -514,9 +555,10 @@ describe('AdminNavigation', () => {
       await tabs[1].trigger('click') // Roles
       await tabs[2].trigger('click') // Analytics
       await tabs[3].trigger('click') // Email Templates
+      await tabs[4].trigger('click') // PLugins
       await tabs[0].trigger('click') // Back to Users
 
-      expect(pushSpy).toHaveBeenCalledTimes(4)
+      expect(pushSpy).toHaveBeenCalledTimes(5)
     })
   })
 
@@ -533,7 +575,7 @@ describe('AdminNavigation', () => {
       wrapper = await createWrapper()
       const initialListeners = wrapper.findAll('.admin-nav-tab')
 
-      expect(initialListeners).toHaveLength(4)
+      expect(initialListeners).toHaveLength(5)
 
       wrapper.unmount()
 
@@ -548,7 +590,7 @@ describe('AdminNavigation', () => {
       const tabs = wrapper.findAll('.admin-nav-tab')
 
       // All 4 tabs should always render (CSS handles responsive layout)
-      expect(tabs).toHaveLength(4)
+      expect(tabs).toHaveLength(5)
     })
 
     it('should have flex layout container for tabs', async () => {
@@ -565,7 +607,7 @@ describe('AdminNavigation', () => {
       const tabs = wrapper.findAll('.admin-nav-tab')
 
       // Should render exactly as many tabs as items in navItems array
-      expect(tabs).toHaveLength(4)
+      expect(tabs).toHaveLength(5)
     })
 
     it('should use key attribute correctly in v-for', async () => {
@@ -581,7 +623,7 @@ describe('AdminNavigation', () => {
       wrapper = await createWrapper()
       const icons = wrapper.findAll('i[class*="pi"]')
 
-      expect(icons).toHaveLength(4)
+      expect(icons).toHaveLength(5)
       expect(icons.every(icon => icon.classes().includes('pi'))).toBe(true)
     })
 
@@ -590,7 +632,7 @@ describe('AdminNavigation', () => {
       const labels = wrapper.findAll('.admin-nav-tab span')
 
       const labelTexts = labels.map(label => label.text())
-      expect(labelTexts).toEqual(['Users', 'Roles', 'Analytics', 'Email Templates'])
+      expect(labelTexts).toEqual(['Users', 'Roles', 'Analytics', 'Email Templates', 'Plugins'])
     })
 
     it('should bind click handler correctly', async () => {
@@ -603,7 +645,7 @@ describe('AdminNavigation', () => {
         await tabs[i].trigger('click')
       }
 
-      expect(pushSpy).toHaveBeenCalledTimes(4)
+      expect(pushSpy).toHaveBeenCalledTimes(5)
     })
 
     it('should conditionally apply active class', async () => {
@@ -611,7 +653,7 @@ describe('AdminNavigation', () => {
       const tabs = wrapper.findAll('.admin-nav-tab')
 
       const activeStates = tabs.map(tab => tab.classes().includes('active'))
-      expect(activeStates).toEqual([false, true, false, false])
+      expect(activeStates).toEqual([false, true, false, false, false])
     })
   })
 })

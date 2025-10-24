@@ -161,7 +161,7 @@ test.describe('Admin - Email Template Management', () => {
 
       // Search input should be cleared
       await page.waitForTimeout(300)
-      expect(await searchInput.inputValue()).toBe('')
+      await expect(searchInput).toHaveValue('')
     })
 
     test('should display template list with columns', async ({ authenticatedPage: page }) => {
@@ -211,8 +211,8 @@ test.describe('Admin - Email Template Management', () => {
 
       // Dialog should open
       await page.waitForTimeout(500)
-      const dialogVisible = await page.locator('.p-dialog, [role="dialog"]').isVisible()
-      expect(dialogVisible).toBeTruthy()
+      const dialogVisible = page.locator('.p-dialog, [role="dialog"]')
+      await expect(dialogVisible).toBeVisible()
     })
 
     test('should show template preview', async ({ authenticatedPage: page }) => {
@@ -227,8 +227,8 @@ test.describe('Admin - Email Template Management', () => {
 
         // Preview dialog should open
         await page.waitForTimeout(500)
-        const dialogVisible = await page.locator('.p-dialog, [role="dialog"]').isVisible()
-        expect(dialogVisible).toBeTruthy()
+        const dialogVisible = page.locator('.p-dialog, [role="dialog"]')
+        await expect(dialogVisible).toBeVisible()
       }
     })
 
@@ -247,8 +247,8 @@ test.describe('Admin - Email Template Management', () => {
 
           // Edit dialog should open
           await page.waitForTimeout(500)
-          const dialogVisible = await page.locator('.p-dialog, [role="dialog"]').isVisible()
-          expect(dialogVisible).toBeTruthy()
+          const dialogVisible = page.locator('.p-dialog, [role="dialog"]')
+          await expect(dialogVisible).toBeVisible()
           break
         }
       }
@@ -265,8 +265,8 @@ test.describe('Admin - Email Template Management', () => {
         // Edit button should be disabled
         const editButton = systemRow.locator('button i.pi-pencil')
         if (await editButton.count() > 0) {
-          const isDisabled = await editButton.first().isDisabled()
-          expect(isDisabled).toBe(true)
+          const isDisabled = editButton.first()
+          await expect(isDisabled).toBeDisabled()
         }
       }
     })
@@ -319,8 +319,8 @@ test.describe('Admin - Email Template Management', () => {
         // Delete button should be disabled
         const deleteButton = systemRow.locator('button i.pi-trash')
         if (await deleteButton.count() > 0) {
-          const isDisabled = await deleteButton.first().isDisabled()
-          expect(isDisabled).toBe(true)
+          const isDisabled = deleteButton.first()
+          await expect(isDisabled).toBeDisabled()
         }
       }
     })

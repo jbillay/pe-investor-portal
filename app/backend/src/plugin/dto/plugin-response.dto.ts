@@ -144,6 +144,18 @@ export class PluginInstallResponseDto {
   pluginId: string;
 
   @ApiProperty({
+    description: 'Plugin name',
+    example: 'My Awesome Plugin',
+  })
+  name: string;
+
+  @ApiProperty({
+    description: 'Plugin version',
+    example: '1.0.0',
+  })
+  version: string;
+
+  @ApiProperty({
     description: 'Success message',
     example: 'Plugin installed successfully',
   })
@@ -154,6 +166,24 @@ export class PluginInstallResponseDto {
     example: '2025-01-15T10:30:00Z',
   })
   installedAt: Date;
+
+  @ApiProperty({
+    description: 'Dependency validation results',
+    required: false,
+    type: Object,
+  })
+  dependencies?: {
+    missingPlugins?: string[];
+    missingPackages?: string[];
+    satisfied: boolean;
+  };
+
+  @ApiProperty({
+    description: 'Installation warnings',
+    type: [String],
+    required: false,
+  })
+  warnings?: string[];
 }
 
 export class PluginManifestResponseDto {

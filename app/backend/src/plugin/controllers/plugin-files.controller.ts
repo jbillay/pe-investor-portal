@@ -7,11 +7,12 @@ import {
   Controller,
   Get,
   Param,
+  Req,
   Res,
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PluginStorageService } from '../services/plugin-storage.service';
@@ -57,10 +58,20 @@ export class PluginFilesController {
   })
   async serveFile(
     @Param('pluginId') pluginId: string,
-    @Param('0') filepath: string,
+    @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
+    // Extract filepath from URL (everything after /files/)
+    const match = req.url.match(/\/files\/(.+)$/);
+    if (!match) {
+      res.status(404).send({ message: 'File path not specified' });
+      return;
+    }
+    // Strip query parameters (e.g., ?import added by Vite)
+    const filepath = match[1].split('?')[0];
+
     try {
+
       // Get plugin info from database
       const plugin = await this.prisma.plugin.findUnique({
         where: { pluginId },

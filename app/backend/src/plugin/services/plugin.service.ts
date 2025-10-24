@@ -219,6 +219,77 @@ export class PluginService {
   }
 
   /**
+   * Validates plugin dependencies
+   * @param manifest Plugin manifest with dependencies
+   * @returns Dependency validation result
+   */
+  private async validateDependencies(manifest: any): Promise<{
+    satisfied: boolean;
+    missingPlugins?: string[];
+    missingPackages?: string[];
+    warnings?: string[];
+  }> {
+    const warnings: string[] = [];
+    const missingPlugins: string[] = [];
+    const missingPackages: string[] = [];
+
+    // Check plugin dependencies
+    if (manifest.dependencies?.plugins) {
+      const requiredPlugins = Array.isArray(manifest.dependencies.plugins)
+        ? manifest.dependencies.plugins
+        : [];
+
+      for (const requiredPlugin of requiredPlugins) {
+        // Parse plugin requirement (e.g., "base-plugin@^1.0.0")
+        const [pluginId, versionRange] = requiredPlugin.split('@');
+
+        // Check if plugin is installed
+        const installedPlugin = await this.prisma.plugin.findFirst({
+          where: {
+            pluginId,
+            status: 'INSTALLED',
+          },
+        });
+
+        if (!installedPlugin) {
+          missingPlugins.push(requiredPlugin);
+        } else if (versionRange) {
+          // Basic version check (you can enhance this with semver library)
+          warnings.push(
+            `Plugin '${pluginId}' is installed but version compatibility not verified`,
+          );
+        }
+      }
+    }
+
+    // Check external package dependencies
+    if (manifest.dependencies?.external) {
+      const requiredPackages = Array.isArray(manifest.dependencies.external)
+        ? manifest.dependencies.external
+        : [];
+
+      for (const requiredPackage of requiredPackages) {
+        // Note: We can't easily check npm packages from backend
+        // This is a placeholder for future enhancement
+        warnings.push(
+          `External package dependency '${requiredPackage}' must be available in frontend`,
+        );
+      }
+    }
+
+    const satisfied =
+      missingPlugins.length === 0 && missingPackages.length === 0;
+
+    return {
+      satisfied,
+      missingPlugins: missingPlugins.length > 0 ? missingPlugins : undefined,
+      missingPackages:
+        missingPackages.length > 0 ? missingPackages : undefined,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    };
+  }
+
+  /**
    * Install a plugin
    * @param id Plugin database ID or plugin ID
    * @param userId User ID who is installing
@@ -248,6 +319,40 @@ export class PluginService {
         );
       }
 
+      // Validate dependencies
+      const manifest = plugin.manifest as any;
+      const dependencyValidation = await this.validateDependencies(manifest);
+
+      // If dependencies are not satisfied, throw error
+      if (!dependencyValidation.satisfied) {
+        const errorParts: string[] = [];
+
+        if (dependencyValidation.missingPlugins?.length) {
+          errorParts.push(
+            `Missing required plugins: ${dependencyValidation.missingPlugins.join(', ')}`,
+          );
+        }
+
+        if (dependencyValidation.missingPackages?.length) {
+          errorParts.push(
+            `Missing required packages: ${dependencyValidation.missingPackages.join(', ')}`,
+          );
+        }
+
+        const errorMessage = errorParts.join('. ');
+
+        // Mark plugin as FAILED with dependency error
+        await this.prisma.plugin.update({
+          where: { id: plugin.id },
+          data: {
+            status: 'FAILED',
+            errorMessage,
+          },
+        });
+
+        throw new BadRequestException(errorMessage);
+      }
+
       // Update plugin status to INSTALLED
       const updatedPlugin = await this.prisma.plugin.update({
         where: { id: plugin.id },
@@ -266,8 +371,12 @@ export class PluginService {
       return {
         success: true,
         pluginId: plugin.pluginId,
+        name: plugin.name,
+        version: plugin.version,
         message: 'Plugin installed successfully',
         installedAt: updatedPlugin.installedAt as Date,
+        dependencies: dependencyValidation,
+        warnings: dependencyValidation.warnings,
       };
     } catch (error) {
       if (

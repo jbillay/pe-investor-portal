@@ -37,6 +37,7 @@ export interface PluginWidget {
   order: number;
   permissions?: string[];
   props?: Record<string, any>;
+  pluginId?: string; // Added at runtime by plugin registry
 }
 
 /**
@@ -170,6 +171,16 @@ export interface PluginListResponse {
 }
 
 /**
+ * Dependency validation result
+ */
+export interface DependencyValidation {
+  satisfied: boolean;
+  missingPlugins?: string[];
+  missingPackages?: string[];
+  warnings?: string[];
+}
+
+/**
  * Plugin install response
  */
 export interface PluginInstallResponse {
@@ -178,6 +189,9 @@ export interface PluginInstallResponse {
   name: string;
   version: string;
   message: string;
+  installedAt: Date;
+  dependencies?: DependencyValidation;
+  warnings?: string[];
 }
 
 /**

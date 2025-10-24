@@ -4,24 +4,50 @@
     :modal="true"
     :closable="false"
     :draggable="false"
+    :focusTrap="true"
+    :aria-labelledby="'dialog-title'"
+    :aria-describedby="'dialog-description'"
     class="plugin-install-dialog w-full max-w-4xl"
   >
     <template #header>
       <div class="flex items-center justify-between w-full">
         <div class="flex items-center gap-3">
-          <i class="pi pi-download text-2xl text-blue-600"></i>
+          <i class="pi pi-download text-2xl text-blue-600" aria-hidden="true"></i>
           <div>
-            <h3 class="text-xl font-bold text-gray-900">Install Plugin</h3>
-            <p class="text-sm text-gray-600">Step {{ currentStep }} of 2</p>
+            <h3 id="dialog-title" class="text-xl font-bold text-gray-900">Install Plugin</h3>
+            <p id="dialog-description" class="text-sm text-gray-600">Step {{ currentStep }} of 3</p>
           </div>
         </div>
-        <div class="flex gap-2">
+        <div
+          role="progressbar"
+          aria-label="Installation wizard progress"
+          :aria-valuenow="currentStep"
+          aria-valuemin="1"
+          aria-valuemax="3"
+          :aria-valuetext="`Step ${currentStep} of 3`"
+          class="flex items-center gap-3"
+        >
           <div
-            v-for="step in 2"
-            :key="step"
-            class="w-2 h-2 rounded-full transition-colors"
-            :class="step <= currentStep ? 'bg-blue-600' : 'bg-gray-300'"
-          ></div>
+            v-for="(stepLabel, index) in ['Upload', 'Review', 'Install']"
+            :key="index + 1"
+            class="flex flex-col items-center"
+          >
+            <div
+              :aria-label="`Step ${index + 1}: ${stepLabel} ${index + 1 < currentStep ? 'completed' : index + 1 === currentStep ? 'current' : 'pending'}`"
+              class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-200"
+              :class="[
+                index + 1 < currentStep ? 'bg-green-500 text-white' :
+                index + 1 === currentStep ? 'bg-blue-600 text-white ring-2 ring-blue-300' :
+                'bg-gray-300 text-gray-600'
+              ]"
+            >
+              <i v-if="index + 1 < currentStep" class="pi pi-check text-xs"></i>
+              <span v-else>{{ index + 1 }}</span>
+            </div>
+            <span class="text-xs font-medium mt-1 transition-colors" :class="index + 1 === currentStep ? 'text-blue-600' : 'text-gray-500'">
+              {{ stepLabel }}
+            </span>
+          </div>
         </div>
       </div>
     </template>
@@ -39,6 +65,12 @@
 
         <!-- File Upload Component -->
         <div class="upload-container">
+          <!-- File Type Information -->
+          <div class="flex items-center justify-center gap-2 mb-3">
+            <Tag severity="info" icon="pi pi-file-o" value=".ZIP files only" />
+            <Tag severity="secondary" icon="pi pi-info-circle" value="Max 10MB" />
+          </div>
+
           <FileUpload
             ref="fileUploadRef"
             mode="basic"
@@ -48,18 +80,27 @@
             chooseLabel="Choose Plugin File"
             chooseIcon="pi pi-upload"
             class="w-full"
+            :pt="{
+              chooseButton: { class: 'p-button-primary' }
+            }"
             @select="handleFileSelect"
           />
 
           <!-- Drag and Drop Zone -->
           <div
-            class="drag-drop-zone mt-4 p-8 border-2 border-dashed rounded-lg text-center transition-colors"
+            role="button"
+            tabindex="0"
+            aria-label="Drag and drop zone for plugin ZIP file upload. Press Enter or Space to select a file."
+            class="drag-drop-zone mt-4 p-8 border-2 border-dashed rounded-lg text-center transition-colors cursor-pointer"
             :class="isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'"
             @dragover.prevent="isDragging = true"
             @dragleave.prevent="isDragging = false"
             @drop.prevent="handleFileDrop"
+            @click="triggerFileInput"
+            @keydown.enter="triggerFileInput"
+            @keydown.space.prevent="triggerFileInput"
           >
-            <i class="pi pi-cloud-upload text-4xl text-gray-400 mb-3"></i>
+            <i class="pi pi-cloud-upload text-4xl text-gray-400 mb-3" aria-hidden="true"></i>
             <p class="text-gray-600 mb-1">Drag and drop your plugin ZIP file here</p>
             <p class="text-sm text-gray-500">or use the button above to browse</p>
           </div>
@@ -93,12 +134,20 @@
 
           <!-- Upload Error -->
           <Message v-if="uploadError" severity="error" class="mt-4" :closable="false">
-            <div class="flex items-center gap-2">
-              <i class="pi pi-exclamation-triangle"></i>
-              <div>
-                <p class="font-medium">Upload Failed</p>
-                <p class="text-sm mt-1">{{ uploadError }}</p>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="pi pi-exclamation-triangle"></i>
+                <div>
+                  <p class="font-medium">Upload Failed</p>
+                  <p class="text-sm mt-1">{{ uploadError }}</p>
+                </div>
               </div>
+              <Button
+                label="Try Again"
+                icon="pi pi-refresh"
+                class="p-button-sm p-button-text p-button-secondary"
+                @click="retryUpload"
+              />
             </div>
           </Message>
         </div>
@@ -172,6 +221,52 @@
               Status
             </label>
             <p class="text-lg font-medium text-gray-900 mt-1">Ready to Install</p>
+          </div>
+        </div>
+
+        <!-- Dependencies Section -->
+        <div v-if="hasDependencies" class="dependencies-section">
+          <h5 class="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <i class="pi pi-sitemap text-blue-600"></i>
+            Dependencies
+          </h5>
+
+          <!-- Plugin Dependencies -->
+          <div v-if="pluginManifest?.dependencies?.plugins?.length" class="mb-4">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">
+              Required Plugins ({{ pluginManifest.dependencies.plugins.length }})
+            </label>
+            <div class="space-y-2">
+              <div
+                v-for="dep in pluginManifest.dependencies.plugins"
+                :key="dep"
+                class="dependency-item p-3 bg-blue-50 rounded-lg border border-blue-200"
+              >
+                <div class="flex items-center gap-2">
+                  <i class="pi pi-puzzle text-blue-600"></i>
+                  <span class="font-mono text-sm text-gray-900">{{ dep }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- External Dependencies -->
+          <div v-if="pluginManifest?.dependencies?.external?.length" class="mb-4">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">
+              External Packages ({{ pluginManifest.dependencies.external.length }})
+            </label>
+            <div class="space-y-2">
+              <div
+                v-for="dep in pluginManifest.dependencies.external"
+                :key="dep"
+                class="dependency-item p-3 bg-green-50 rounded-lg border border-green-200"
+              >
+                <div class="flex items-center gap-2">
+                  <i class="pi pi-box text-green-600"></i>
+                  <span class="font-mono text-sm text-gray-900">{{ dep }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -295,19 +390,141 @@
           </div>
         </Message>
       </div>
+
+      <!-- Step 3: Installation Progress -->
+      <div v-if="currentStep === 3" class="installation-step">
+        <div class="installation-progress-container">
+          <!-- Installation Steps Progress -->
+          <div class="space-y-4 mb-6">
+            <div
+              v-for="(step, index) in installationSteps"
+              :key="index"
+              class="progress-step rounded-lg transition-all"
+              :class="{
+                'bg-blue-50 border border-blue-200': step.status === 'in_progress',
+                'bg-green-50 border border-green-200': step.status === 'completed',
+                'bg-red-50 border border-red-200': step.status === 'error',
+                'bg-gray-50 border border-gray-200': step.status === 'pending',
+                'cursor-pointer hover:shadow-md': step.error
+              }"
+              @click="step.error ? toggleStepExpansion(step.id) : null"
+            >
+              <div class="flex items-start gap-3 p-4">
+                <!-- Step Icon -->
+                <div class="flex-shrink-0 mt-0.5">
+                  <ProgressSpinner
+                    v-if="step.status === 'in_progress'"
+                    style="width: 24px; height: 24px"
+                    strokeWidth="4"
+                    class="text-blue-600"
+                  />
+                  <i
+                    v-else-if="step.status === 'completed'"
+                    class="pi pi-check-circle text-2xl text-green-600"
+                  ></i>
+                  <i
+                    v-else-if="step.status === 'error'"
+                    class="pi pi-times-circle text-2xl text-red-600"
+                  ></i>
+                  <i
+                    v-else
+                    class="pi pi-circle text-2xl text-gray-400"
+                  ></i>
+                </div>
+
+                <!-- Step Content -->
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <h6 class="font-semibold text-gray-900">{{ step.label }}</h6>
+                    <i
+                      v-if="step.error"
+                      class="pi transition-transform"
+                      :class="expandedSteps.has(step.id) ? 'pi-chevron-up' : 'pi-chevron-down'"
+                    ></i>
+                  </div>
+                  <p class="text-sm text-gray-600 mt-1">{{ step.description }}</p>
+                </div>
+              </div>
+
+              <!-- Expandable Error Details -->
+              <div
+                v-if="step.error && expandedSteps.has(step.id)"
+                class="px-4 pb-4 pt-2 border-t border-red-300"
+              >
+                <div class="bg-white p-3 rounded border border-red-200">
+                  <p class="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">
+                    Error Details
+                  </p>
+                  <p class="text-sm text-red-600 font-mono">{{ step.error }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Installation Result -->
+          <div v-if="installationResult" class="installation-result">
+            <!-- Success Message -->
+            <Message
+              v-if="installationResult.success"
+              severity="success"
+              :closable="false"
+              class="mb-4"
+            >
+              <div class="flex items-start gap-3">
+                <i class="pi pi-check-circle text-2xl"></i>
+                <div class="flex-1">
+                  <p class="font-bold text-lg mb-2">Plugin Installed Successfully!</p>
+                  <p class="text-sm mb-3">
+                    {{ installationResult.name }} v{{ installationResult.version }} has been
+                    installed and is now active.
+                  </p>
+                  <div v-if="installationResult.warnings?.length" class="mt-3">
+                    <p class="font-medium text-sm mb-1">Installation Warnings:</p>
+                    <ul class="list-disc list-inside text-sm space-y-1">
+                      <li v-for="(warning, index) in installationResult.warnings" :key="index">
+                        {{ warning }}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </Message>
+
+            <!-- Error Message -->
+            <Message
+              v-else
+              severity="error"
+              :closable="false"
+              class="mb-4"
+            >
+              <div class="flex items-start gap-3">
+                <i class="pi pi-times-circle text-2xl"></i>
+                <div class="flex-1">
+                  <p class="font-bold text-lg mb-2">Installation Failed</p>
+                  <p class="text-sm">
+                    {{ installationError }}
+                  </p>
+                </div>
+              </div>
+            </Message>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Dialog Footer -->
     <template #footer>
       <div class="flex items-center justify-between w-full">
         <Button
-          label="Cancel"
+          v-if="currentStep !== 3 || !isInstalling"
+          :label="isInstalling ? 'Cancel Installation' : 'Cancel'"
           icon="pi pi-times"
-          class="p-button-text p-button-secondary"
-          @click="handleCancel"
-          :disabled="isUploading || isInstalling"
+          class="p-button-text"
+          :class="isInstalling ? 'p-button-danger' : 'p-button-secondary'"
+          @click="isInstalling ? handleCancelInstallation : handleCancel"
+          :disabled="isUploading"
         />
-        <div class="flex gap-2">
+        <div class="flex gap-2 ml-auto">
           <Button
             v-if="currentStep === 2"
             label="Back"
@@ -331,9 +548,15 @@
             label="Install Plugin"
             icon="pi pi-check"
             class="p-button-success"
-            @click="installPlugin"
-            :disabled="hasValidationErrors || isInstalling"
-            :loading="isInstalling"
+            @click="startInstallation"
+            :disabled="hasValidationErrors"
+          />
+          <Button
+            v-if="currentStep === 3 && installationResult"
+            :label="installationResult.success ? 'Close' : 'Close'"
+            :icon="installationResult.success ? 'pi pi-check' : 'pi pi-times'"
+            :class="installationResult.success ? 'p-button-success' : 'p-button-secondary'"
+            @click="handleClose"
           />
         </div>
       </div>
@@ -342,10 +565,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
+import { useConfirm } from 'primevue/useconfirm';
 import { pluginApiService } from '@/services/pluginApiService';
-import type { PluginManifest } from '@/types/plugin';
+import { usePluginRegistryStore } from '@/stores/pluginRegistry';
+import type { PluginManifest, PluginInstallResponse } from '@/types/plugin';
 
 // PrimeVue Components
 import Dialog from 'primevue/dialog';
@@ -355,10 +580,11 @@ import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import Message from 'primevue/message';
 import ProgressBar from 'primevue/progressbar';
+import ProgressSpinner from 'primevue/progressspinner';
 
 /**
  * PluginInstallDialog Component
- * Multi-step wizard for uploading and installing plugins
+ * Three-step wizard for uploading, reviewing, and installing plugins
  */
 
 // Props
@@ -380,13 +606,17 @@ const emit = defineEmits<Emits>();
 
 // Composables
 const toast = useToast();
+const confirm = useConfirm();
+const pluginRegistry = usePluginRegistryStore();
 
 // Refs
 const fileUploadRef = ref();
 
-// State
+// State - Step Management
 const dialogVisible = ref(false);
-const currentStep = ref<1 | 2>(1);
+const currentStep = ref<1 | 2 | 3>(1);
+
+// State - Upload Step
 const selectedFile = ref<File | null>(null);
 const uploadedPluginId = ref<string | null>(null);
 const pluginData = ref<any | null>(null);
@@ -394,12 +624,67 @@ const pluginManifest = ref<PluginManifest | null>(null);
 const validationErrors = ref<string[]>([]);
 const validationWarnings = ref<string[]>([]);
 const isUploading = ref(false);
-const isInstalling = ref(false);
 const uploadError = ref<string | null>(null);
 const isDragging = ref(false);
 
+// State - Installation Step
+const isInstalling = ref(false);
+const installationCancelled = ref(false);
+const installationResult = ref<PluginInstallResponse | null>(null);
+const installationError = ref<string | null>(null);
+const expandedSteps = ref<Set<string>>(new Set());
+
+type InstallStepStatus = 'pending' | 'in_progress' | 'completed' | 'error';
+
+interface InstallStep {
+  id: string;
+  label: string;
+  description: string;
+  status: InstallStepStatus;
+  error?: string;
+}
+
+const installationSteps = ref<InstallStep[]>([
+  {
+    id: 'validate',
+    label: 'Validating Plugin',
+    description: 'Checking plugin compatibility and dependencies',
+    status: 'pending',
+  },
+  {
+    id: 'dependencies',
+    label: 'Checking Dependencies',
+    description: 'Verifying required plugins and packages',
+    status: 'pending',
+  },
+  {
+    id: 'install',
+    label: 'Installing Plugin',
+    description: 'Updating plugin status and configuration',
+    status: 'pending',
+  },
+  {
+    id: 'register',
+    label: 'Registering Components',
+    description: 'Loading plugin menus and widgets',
+    status: 'pending',
+  },
+  {
+    id: 'complete',
+    label: 'Finalization',
+    description: 'Plugin installation complete',
+    status: 'pending',
+  },
+]);
+
 // Computed
 const hasValidationErrors = computed(() => validationErrors.value.length > 0);
+
+const hasDependencies = computed(() => {
+  const hasPluginDeps = pluginManifest.value?.dependencies?.plugins?.length ?? 0 > 0;
+  const hasExternalDeps = pluginManifest.value?.dependencies?.external?.length ?? 0 > 0;
+  return hasPluginDeps || hasExternalDeps;
+});
 
 const hasPermissions = computed(() => {
   return pluginManifest.value?.permissions?.required?.length ?? 0 > 0;
@@ -427,7 +712,7 @@ watch(dialogVisible, (newValue) => {
   emit('update:visible', newValue);
 });
 
-// Methods
+// Methods - Dialog Management
 const resetDialog = () => {
   currentStep.value = 1;
   selectedFile.value = null;
@@ -438,10 +723,39 @@ const resetDialog = () => {
   validationWarnings.value = [];
   isUploading.value = false;
   isInstalling.value = false;
+  installationCancelled.value = false;
   uploadError.value = null;
   isDragging.value = false;
+  installationResult.value = null;
+  installationError.value = null;
+  expandedSteps.value.clear();
+  resetInstallationSteps();
 };
 
+const toggleStepExpansion = (stepId: string) => {
+  if (expandedSteps.value.has(stepId)) {
+    expandedSteps.value.delete(stepId);
+  } else {
+    expandedSteps.value.add(stepId);
+  }
+};
+
+const resetInstallationSteps = () => {
+  installationSteps.value.forEach(step => {
+    step.status = 'pending';
+    step.error = undefined;
+  });
+};
+
+const updateStepStatus = (stepId: string, status: InstallStepStatus, error?: string) => {
+  const step = installationSteps.value.find(s => s.id === stepId);
+  if (step) {
+    step.status = status;
+    step.error = error;
+  }
+};
+
+// Methods - File Upload
 const handleFileSelect = (event: any) => {
   const files = event.files;
   if (files && files.length > 0) {
@@ -482,6 +796,16 @@ const clearSelectedFile = () => {
   }
 };
 
+const triggerFileInput = () => {
+  // Programmatically trigger the file upload input
+  if (fileUploadRef.value) {
+    const input = fileUploadRef.value.$el.querySelector('input[type="file"]');
+    if (input) {
+      input.click();
+    }
+  }
+};
+
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -490,7 +814,42 @@ const formatFileSize = (bytes: number): string => {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 };
 
+const retryUpload = () => {
+  uploadError.value = null;
+  if (selectedFile.value) {
+    uploadPlugin();
+  }
+};
+
 const uploadPlugin = async () => {
+  if (!selectedFile.value) return;
+
+  // Warn for files larger than 5MB
+  const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024; // 5MB
+  if (selectedFile.value.size > LARGE_FILE_THRESHOLD) {
+    return new Promise<void>((resolve) => {
+      confirm.require({
+        message: `This file is ${formatFileSize(selectedFile.value!.size)}. Large plugins may take longer to upload and install. Do you want to continue?`,
+        header: 'Large File Warning',
+        icon: 'pi pi-exclamation-circle',
+        acceptLabel: 'Yes, Continue',
+        rejectLabel: 'Cancel',
+        accept: async () => {
+          await performUpload();
+          resolve();
+        },
+        reject: () => {
+          resolve();
+        },
+      });
+    });
+  }
+
+  // For smaller files, upload directly
+  await performUpload();
+};
+
+const performUpload = async () => {
   if (!selectedFile.value) return;
 
   try {
@@ -526,22 +885,94 @@ const uploadPlugin = async () => {
   }
 };
 
-const installPlugin = async () => {
+// Methods - Installation
+const startInstallation = async () => {
   if (!uploadedPluginId.value) return;
 
+  currentStep.value = 3;
+  isInstalling.value = true;
+  installationCancelled.value = false;
+  resetInstallationSteps();
+
   try {
-    isInstalling.value = true;
+    // Step 1: Validate
+    updateStepStatus('validate', 'in_progress');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    if (installationCancelled.value) throw new Error('Installation cancelled by user');
+    updateStepStatus('validate', 'completed');
 
-    await pluginApiService.installPlugin(uploadedPluginId.value);
+    // Step 2: Check Dependencies
+    updateStepStatus('dependencies', 'in_progress');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    if (installationCancelled.value) throw new Error('Installation cancelled by user');
+    updateStepStatus('dependencies', 'completed');
 
-    // Success - close dialog and emit event
-    dialogVisible.value = false;
+    // Step 3: Install Plugin
+    updateStepStatus('install', 'in_progress');
+    const response = await pluginApiService.installPlugin(uploadedPluginId.value);
+    if (installationCancelled.value) throw new Error('Installation cancelled by user');
+    updateStepStatus('install', 'completed');
+
+    // Step 4: Register Components
+    updateStepStatus('register', 'in_progress');
+    await pluginRegistry.refreshPluginRegistry();
+    await new Promise(resolve => setTimeout(resolve, 500));
+    if (installationCancelled.value) throw new Error('Installation cancelled by user');
+    updateStepStatus('register', 'completed');
+
+    // Step 5: Complete
+    updateStepStatus('complete', 'in_progress');
+    await new Promise(resolve => setTimeout(resolve, 300));
+    if (installationCancelled.value) throw new Error('Installation cancelled by user');
+    updateStepStatus('complete', 'completed');
+
+    // Store result
+    installationResult.value = response;
+
+    // Show success toast
+    toast.add({
+      severity: 'success',
+      summary: 'Plugin Installed',
+      detail: `${response.name} v${response.version} installed successfully`,
+      life: 5000,
+    });
+
+    // Emit event
     emit('plugin-installed');
-
-    // Reset dialog state
-    resetDialog();
   } catch (error: any) {
     console.error('Installation error:', error);
+    installationError.value = error.message || 'Failed to install plugin';
+
+    // Mark current step as error
+    const currentStepIndex = installationSteps.value.findIndex(
+      s => s.status === 'in_progress'
+    );
+    if (currentStepIndex >= 0) {
+      updateStepStatus(
+        installationSteps.value[currentStepIndex].id,
+        'error',
+        error.message
+      );
+    }
+
+    // Store error result
+    installationResult.value = {
+      success: false,
+      pluginId: uploadedPluginId.value!,
+      name: pluginData.value?.name || 'Unknown',
+      version: pluginData.value?.version || '0.0.0',
+      message: error.message || 'Installation failed',
+      installedAt: new Date(),
+    };
+
+    // Auto-delete the failed plugin
+    try {
+      await pluginApiService.deletePlugin(uploadedPluginId.value);
+      console.log('Auto-deleted failed plugin:', uploadedPluginId.value);
+    } catch (deleteError) {
+      console.warn('Failed to auto-delete plugin:', deleteError);
+    }
+
     toast.add({
       severity: 'error',
       summary: 'Installation Failed',
@@ -553,15 +984,19 @@ const installPlugin = async () => {
   }
 };
 
+// Methods - Navigation
+const goBackToUpload = () => {
+  currentStep.value = 1;
+};
+
 const handleCancel = async () => {
   // If plugin was uploaded but not installed, clean it up
-  if (uploadedPluginId.value) {
+  if (uploadedPluginId.value && currentStep.value < 3) {
     try {
       await pluginApiService.deletePlugin(uploadedPluginId.value);
       console.log('Cleaned up uploaded plugin:', uploadedPluginId.value);
     } catch (error) {
       console.warn('Failed to cleanup uploaded plugin:', error);
-      // Don't block dialog close on cleanup error
     }
   }
 
@@ -570,9 +1005,65 @@ const handleCancel = async () => {
   resetDialog();
 };
 
-const goBackToUpload = () => {
-  currentStep.value = 1;
-  // Keep the uploaded file info but allow re-upload
+const handleCancelInstallation = () => {
+  confirm.require({
+    message: 'Are you sure you want to cancel the plugin installation? This action cannot be undone and may leave the plugin in an incomplete state.',
+    header: 'Cancel Installation',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Yes, Cancel Installation',
+    rejectLabel: 'Continue Installing',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      // Set cancellation flag
+      installationCancelled.value = true;
+
+      // Mark current step as error
+      const currentStepIndex = installationSteps.value.findIndex(
+        s => s.status === 'in_progress'
+      );
+      if (currentStepIndex >= 0) {
+        updateStepStatus(
+          installationSteps.value[currentStepIndex].id,
+          'error',
+          'Installation cancelled by user'
+        );
+      }
+
+      // Try to cleanup the uploaded plugin
+      if (uploadedPluginId.value) {
+        try {
+          await pluginApiService.deletePlugin(uploadedPluginId.value);
+          console.log('Cleaned up cancelled plugin:', uploadedPluginId.value);
+
+          toast.add({
+            severity: 'info',
+            summary: 'Installation Cancelled',
+            detail: 'Plugin installation has been cancelled and cleaned up.',
+            life: 4000,
+          });
+        } catch (error) {
+          console.warn('Failed to cleanup cancelled plugin:', error);
+          toast.add({
+            severity: 'warn',
+            summary: 'Installation Cancelled',
+            detail: 'Installation was cancelled but cleanup failed. You may need to manually remove the plugin.',
+            life: 5000,
+          });
+        }
+      }
+
+      // Close dialog after a brief delay to show the cancellation state
+      setTimeout(() => {
+        dialogVisible.value = false;
+        resetDialog();
+      }, 1500);
+    },
+  });
+};
+
+const handleClose = () => {
+  dialogVisible.value = false;
+  resetDialog();
 };
 
 const getPluginIconUrl = (): string => {
@@ -581,6 +1072,36 @@ const getPluginIconUrl = (): string => {
   }
   return pluginApiService.getPluginFileUrl(uploadedPluginId.value, pluginData.value.icon);
 };
+
+// Keyboard navigation support
+const handleKeyDown = (event: KeyboardEvent) => {
+  // Only handle if dialog is visible
+  if (!dialogVisible.value) return;
+
+  // Escape key - close dialog (unless installing)
+  if (event.key === 'Escape' && !isInstalling.value && currentStep.value !== 3) {
+    event.preventDefault();
+    handleCancel();
+  }
+
+  // Ctrl+Enter - quick navigation to next step
+  if (event.key === 'Enter' && event.ctrlKey) {
+    event.preventDefault();
+    if (currentStep.value === 1 && selectedFile.value && !isUploading.value) {
+      uploadPlugin();
+    } else if (currentStep.value === 2 && !hasValidationErrors.value) {
+      startInstallation();
+    }
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
 </script>
 
 <style scoped>
@@ -625,20 +1146,40 @@ const getPluginIconUrl = (): string => {
   @apply border-gray-300 shadow-sm;
 }
 
+.installation-step {
+  @apply px-4;
+}
+
+.installation-progress-container {
+  @apply max-h-[600px] overflow-y-auto;
+}
+
+.progress-step {
+  @apply transform transition-all duration-300;
+}
+
+.progress-step:hover {
+  @apply shadow-sm scale-[1.01];
+}
+
 /* Scrollbar styling */
-.preview-step::-webkit-scrollbar {
+.preview-step::-webkit-scrollbar,
+.installation-progress-container::-webkit-scrollbar {
   width: 8px;
 }
 
-.preview-step::-webkit-scrollbar-track {
+.preview-step::-webkit-scrollbar-track,
+.installation-progress-container::-webkit-scrollbar-track {
   @apply bg-gray-100 rounded;
 }
 
-.preview-step::-webkit-scrollbar-thumb {
+.preview-step::-webkit-scrollbar-thumb,
+.installation-progress-container::-webkit-scrollbar-thumb {
   @apply bg-gray-400 rounded;
 }
 
-.preview-step::-webkit-scrollbar-thumb:hover {
+.preview-step::-webkit-scrollbar-thumb:hover,
+.installation-progress-container::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-500;
 }
 

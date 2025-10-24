@@ -123,7 +123,7 @@ test.describe('Admin - User Management', () => {
         await page.waitForTimeout(500)
 
         // Results should be filtered
-        expect(await searchInput.inputValue()).toBe('test@example.com')
+        await expect(searchInput).toHaveValue('test@example.com')
       }
     })
 
@@ -167,7 +167,7 @@ test.describe('Admin - User Management', () => {
       await page.click('button:has-text("Cancel")')
 
       // Dialog should close
-      await expect(page.locator('text=Invite New User')).not.toBeVisible()
+      await expect(page.locator('text=Invite New User')).toBeHidden()
     })
 
     test('should show success message when sending invite', async ({ authenticatedPage: page }) => {
@@ -183,7 +183,7 @@ test.describe('Admin - User Management', () => {
       await expect(page.locator('text=Invitation Sent, text=invitation')).toBeVisible({ timeout: 3000 })
 
       // Dialog should close
-      await expect(page.locator('text=Invite New User')).not.toBeVisible()
+      await expect(page.locator('text=Invite New User')).toBeHidden()
     })
 
     test('should refresh user data', async ({ authenticatedPage: page }) => {
@@ -308,7 +308,7 @@ test.describe('Admin - User Management', () => {
       // Mobile menu might appear
       const mobileMenu = page.locator('button[aria-label*="menu"], button.menu-button, i.pi-bars')
       if (await mobileMenu.isVisible()) {
-        expect(await mobileMenu.isVisible()).toBeTruthy()
+        await expect(mobileMenu).toBeVisible()
       }
     })
 

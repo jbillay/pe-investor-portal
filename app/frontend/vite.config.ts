@@ -19,12 +19,21 @@ export default defineConfig({
       '@composables': fileURLToPath(new URL('./src/composables', import.meta.url)),
       '@services': fileURLToPath(new URL('./src/services', import.meta.url)),
       '@types': fileURLToPath(new URL('./src/types', import.meta.url)),
-      '@assets': fileURLToPath(new URL('./src/assets', import.meta.url))
+      '@assets': fileURLToPath(new URL('./src/assets', import.meta.url)),
+      // Use Vue build with template compiler for plugin support
+      'vue': 'vue/dist/vue.esm-bundler.js'
     },
   },
   server: {
     port: 3000,
-    open: true
+    open: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        secure: false
+      }
+    }
   },
   preview: {
     port: 4173

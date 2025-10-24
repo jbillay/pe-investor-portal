@@ -21,7 +21,30 @@ class ApiClient {
   private setupInterceptors() {
     // Request interceptor to add auth token
     this.instance.interceptors.request.use(
-      (config) => {
+      async (config) => {
+        // Don't wait for refresh on logout requests to prevent circular dependency
+        const isLogoutRequest = config.url?.includes('/auth/logout')
+
+        // If a token refresh is in progress, wait for it to complete
+        // This prevents new requests from using stale tokens
+        if (this.refreshTokenPromise && !isLogoutRequest) {
+          try {
+            // Wait for the refresh to complete (with reasonable timeout)
+            await Promise.race([
+              this.refreshTokenPromise,
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Refresh wait timeout')), 15000)
+              )
+            ])
+          } catch (err: any) {
+            // If refresh fails, don't proceed - the response interceptor will handle logout
+            // If it's just a timeout, let the request continue and it will retry refresh
+            if (err.message !== 'Refresh wait timeout') {
+              throw err
+            }
+          }
+        }
+
         const authStore = useAuthStore()
         if (authStore.accessToken) {
           config.headers.Authorization = `Bearer ${authStore.accessToken}`
@@ -35,6 +58,16 @@ class ApiClient {
     this.instance.interceptors.response.use(
       (response) => response,
       async (error) => {
+        // Handle timeout errors
+        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+          console.error('Request timeout:', error.config?.url)
+          const enhancedError = new Error(
+            'Request timeout - The server took too long to respond. Please try again.'
+          )
+          enhancedError.name = 'TimeoutError'
+          return Promise.reject(enhancedError)
+        }
+
         // Handle network errors (backend not available)
         if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
           const enhancedError = new Error(
@@ -77,8 +110,16 @@ class ApiClient {
 
           // Don't try to refresh if this IS the refresh request - avoid infinite loop
           if (originalRequest.url?.includes('/auth/refresh')) {
-            const authStore = useAuthStore()
-            await authStore.logout()
+            // Clear the refresh promise immediately so waiting requests fail fast
+            this.refreshTokenPromise = null
+
+            // Clear localStorage directly to prevent logout from making API call
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('refreshToken')
+            localStorage.removeItem('user')
+            localStorage.removeItem('requiresPasswordChange')
+
+            // Redirect to login immediately
             window.location.href = '/login'
             return Promise.reject(error)
           }
