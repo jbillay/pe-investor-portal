@@ -31,7 +31,7 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: app/backend
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build backend
         working-directory: app/backend
@@ -39,7 +39,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: app/frontend
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build frontend
         working-directory: app/frontend
