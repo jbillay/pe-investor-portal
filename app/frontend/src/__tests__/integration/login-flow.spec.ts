@@ -10,17 +10,18 @@ import { useAuthStore } from '@stores/auth'
 import { mockUser, mockLoginResponse, setupTest, mockLocalStorage } from '../utils/test-utils'
 
 // Mock the API client
-const mockApiClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  patch: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn()
-}
-
 vi.mock('@composables/useApi', () => ({
-  apiClient: mockApiClient
+  apiClient: {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn()
+  }
 }))
+
+// Get reference to the mocked API client after mock is set up
+const { apiClient: mockApiClient } = await import('@composables/useApi')
 
 // Create a full router setup similar to the actual application
 const createIntegrationRouter = () => {
@@ -118,7 +119,19 @@ describe('Login Flow Integration Tests', () => {
           // Don't stub these components for integration testing
           'AppLayout': false,
           'LoginView': false,
-          'DashboardView': false
+          'DashboardView': false,
+          // Stub PrimeVue components
+          'Toast': true,
+          'ConfirmDialog': true,
+          'ProgressSpinner': true
+        },
+        provide: {
+          // Provide mocked PrimeVue services
+          [Symbol.for('primevue.toast')]: {
+            add: vi.fn(),
+            removeGroup: vi.fn(),
+            removeAllGroups: vi.fn()
+          }
         }
       }
     })

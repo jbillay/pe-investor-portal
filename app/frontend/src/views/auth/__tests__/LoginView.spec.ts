@@ -7,13 +7,14 @@ import { useAuthStore } from '@stores/auth'
 import { mockUser, mockLoginResponse, setupTest } from '../../../__tests__/utils/test-utils'
 
 // Mock the API client
-const mockApiClient = {
-  post: vi.fn()
-}
-
 vi.mock('@composables/useApi', () => ({
-  apiClient: mockApiClient
+  apiClient: {
+    post: vi.fn()
+  }
 }))
+
+// Get reference to the mocked API client after mock is set up
+const { apiClient: mockApiClient } = await import('@composables/useApi')
 
 // Mock router
 const mockRouter = createRouter({

@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 import { createPinia } from 'pinia'
+import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
+import ConfirmationService from 'primevue/confirmationservice'
 import App from '../App.vue'
 
 // Mock router
@@ -21,9 +24,12 @@ describe('App', () => {
   it('should render router-view', () => {
     const wrapper = mount(App, {
       global: {
-        plugins: [createPinia(), mockRouter],
+        plugins: [createPinia(), mockRouter, PrimeVue, ToastService, ConfirmationService],
         stubs: {
-          'router-view': { template: '<div class="router-content">Router Content</div>' }
+          'router-view': { template: '<div class="router-content">Router Content</div>' },
+          Toast: true,
+          ConfirmDialog: true,
+          ProgressSpinner: true
         }
       }
     })
@@ -36,8 +42,13 @@ describe('App', () => {
   it('should have correct structure', () => {
     const wrapper = mount(App, {
       global: {
-        plugins: [createPinia(), mockRouter],
-        stubs: { 'router-view': true }
+        plugins: [createPinia(), mockRouter, PrimeVue, ToastService, ConfirmationService],
+        stubs: {
+          'router-view': true,
+          Toast: true,
+          ConfirmDialog: true,
+          ProgressSpinner: true
+        }
       }
     })
 
@@ -50,8 +61,13 @@ describe('App', () => {
     expect(() => {
       mount(App, {
         global: {
-          plugins: [createPinia(), mockRouter],
-          stubs: { 'router-view': true }
+          plugins: [createPinia(), mockRouter, PrimeVue, ToastService, ConfirmationService],
+          stubs: {
+            'router-view': true,
+            Toast: true,
+            ConfirmDialog: true,
+            ProgressSpinner: true
+          }
         }
       })
     }).not.toThrow()

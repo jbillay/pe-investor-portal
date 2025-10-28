@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import CapitalActivityView from './CapitalActivityView.vue';
 import { TestHelper, testIds } from '../test/utils/test-helpers';
