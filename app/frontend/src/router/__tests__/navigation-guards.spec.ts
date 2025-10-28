@@ -5,14 +5,15 @@ import { useAuthStore } from '@stores/auth'
 import { mockUser, setupTest } from '../../__tests__/utils/test-utils'
 
 // Mock the API client
-const mockApiClient = {
-  get: vi.fn(),
-  post: vi.fn()
-}
-
 vi.mock('@composables/useApi', () => ({
-  apiClient: mockApiClient
+  apiClient: {
+    get: vi.fn(),
+    post: vi.fn()
+  }
 }))
+
+// Get reference to the mocked API client after mock is set up
+const { apiClient: mockApiClient } = await import('@composables/useApi')
 
 // Mock components
 const MockLoginView = { template: '<div>Login</div>' }
