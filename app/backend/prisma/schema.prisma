@@ -573,3 +573,223 @@ enum PluginStatus {
   FAILED        // Installation failed
   UNINSTALLED   // Uninstalled but files kept
 }
+
+// ============================================================================
+// DYNAMIC DATA OBJECTS MODELS
+// ============================================================================
+
+// Data Object Definition - Admin-created configurable entities
+model DataObject {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  dataKey     String   @unique @db.VarChar(100)  // camelCase identifier (e.g., "fund", "portfolio")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+  updatedBy   String
+
+  // Relations
+  versions    DataObjectVersion[]
+  fields      DataField[]
+  instances   DataObjectInstance[]
+
+  // Indexes
+  @@index([dataKey])
+  @@index([isActive])
+  @@map("data_objects")
+}
+
+// Data Object Version - Maintains version history with schema snapshots
+model DataObjectVersion {
+  id             String   @id @default(uuid()) @db.Uuid
+  dataObjectId   String   @db.Uuid
+  version        Int
+  name           String   @db.VarChar(255)
+  description    String?  @db.Text
+  schemaSnapshot Json     // Complete schema at this version
+  createdAt      DateTime @default(now())
+  createdBy      String
+
+  // Relations
+  dataObject     DataObject @relation(fields: [dataObjectId], references: [id], onDelete: Cascade)
+
+  // Constraints
+  @@unique([dataObjectId, version])
+  @@index([dataObjectId])
+  @@map("data_object_versions")
+}
+
+// Data Field - Field definitions for each data object
+model DataField {
+  id              String   @id @default(uuid()) @db.Uuid
+  dataObjectId    String   @db.Uuid
+  name            String   @db.VarChar(255)
+  fieldKey        String   @db.VarChar(100)  // camelCase identifier
+  dataType        FieldDataType  // Enum of supported field types
+  fieldOrder      Int      @default(0)
+  description     String?  @db.Text
+  isMandatory     Boolean  @default(false)
+  isReadOnly      Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  defaultValue    String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String
+  updatedBy       String
+
+  // Relations
+  dataObject      DataObject @relation(fields: [dataObjectId], references: [id], onDelete: Cascade)
+  validationRules FieldValidationRule[]
+  dropdownOptions FieldDropdownOption[]
+  fieldValues     InstanceFieldValue[]
+
+  // Constraints
+  @@unique([dataObjectId, fieldKey])
+  @@index([dataObjectId])
+  @@index([fieldKey])
+  @@index([fieldOrder])
+  @@map("data_fields")
+}
+
+// Field Data Type Enum - All supported field types
+enum FieldDataType {
+  TEXT                    // Single-line text input
+  TEXTAREA                // Multi-line text input
+  NUMBER                  // Numeric input
+  CURRENCY                // Money with currency code
+  DATE                    // Date picker
+  DATETIME                // Date + time picker
+  BOOLEAN                 // Checkbox/toggle
+  SINGLE_SELECT           // Dropdown (single choice)
+  MULTI_SELECT            // Dropdown (multiple choices)
+  EMAIL                   // Email with validation
+  URL                     // URL with validation
+  FILE                    // File upload
+  RICH_TEXT               // WYSIWYG editor
+  RELATIONSHIP            // Link to another data object instance
+}
+
+// Field Validation Rule - Custom validation rules per field
+model FieldValidationRule {
+  id          String   @id @default(uuid()) @db.Uuid
+  fieldId     String   @db.Uuid
+  ruleType    ValidationRuleType   // Type of validation rule
+  ruleValue   String   @db.Text
+  errorMessage String  @db.Text
+  createdAt   DateTime @default(now())
+
+  // Relations
+  field       DataField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@index([fieldId])
+  @@map("field_validation_rules")
+}
+
+// Validation Rule Type Enum
+enum ValidationRuleType {
+  MIN_LENGTH
+  MAX_LENGTH
+  MIN_VALUE
+  MAX_VALUE
+  REGEX
+  CUSTOM
+}
+
+// Field Dropdown Option - Options for SELECT field types
+model FieldDropdownOption {
+  id          String   @id @default(uuid()) @db.Uuid
+  fieldId     String   @db.Uuid
+  label       String   @db.VarChar(255)
+  value       String   @db.VarChar(255)
+  orderIndex  Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  field       DataField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@index([fieldId])
+  @@index([orderIndex])
+  @@map("field_dropdown_options")
+}
+
+// Data Object Instance - User-created instances (EAV pattern)
+model DataObjectInstance {
+  id             String   @id @default(uuid()) @db.Uuid
+  dataObjectId   String   @db.Uuid
+  versionNumber  Int      // Schema version when created
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String
+  updatedBy      String
+
+  // Relations
+  dataObject     DataObject @relation(fields: [dataObjectId], references: [id], onDelete: Restrict)
+  fieldValues    InstanceFieldValue[]
+  changeLog      InstanceChangeLog[]
+
+  @@index([dataObjectId])
+  @@index([createdAt])
+  @@index([isActive])
+  @@map("data_object_instances")
+}
+
+// Instance Field Value - EAV storage for field values
+model InstanceFieldValue {
+  id              String   @id @default(uuid()) @db.Uuid
+  instanceId      String   @db.Uuid
+  fieldId         String   @db.Uuid
+
+  // Type-specific storage columns
+  textValue       String?  @db.Text
+  numberValue     Decimal? @db.Decimal(20, 4)
+  dateValue       DateTime?
+  booleanValue    Boolean?
+  jsonValue       Json?    // For complex types (file metadata, rich text, etc.)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  instance        DataObjectInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  field           DataField @relation(fields: [fieldId], references: [id], onDelete: Restrict)
+
+  // Constraints
+  @@unique([instanceId, fieldId])
+  @@index([instanceId])
+  @@index([fieldId])
+  @@index([textValue])  // For text searches
+  @@index([numberValue])
+  @@index([dateValue])
+  @@map("instance_field_values")
+}
+
+// Instance Change Log - Audit trail for all changes
+model InstanceChangeLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  instanceId      String   @db.Uuid
+  fieldId         String?  @db.Uuid  // null means instance-level change
+  changeType      ChangeType  // CREATE, UPDATE, DELETE
+  oldValue        String?  @db.Text
+  newValue        String?  @db.Text
+  changedAt       DateTime @default(now())
+  changedBy       String
+
+  // Relations
+  instance        DataObjectInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId])
+  @@index([changedAt])
+  @@index([changedBy])
+  @@map("instance_change_log")
+}
+
+// Change Type Enum
+enum ChangeType {
+  CREATE
+  UPDATE
+  DELETE
+}

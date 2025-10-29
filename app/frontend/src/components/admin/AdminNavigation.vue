@@ -38,6 +38,11 @@ const navItems: NavItem[] = [
     path: '/admin/roles'
   },
   {
+    label: 'Data Objects',
+    icon: 'pi-database',
+    path: '/admin/data-objects'
+  },
+  {
     label: 'Analytics',
     icon: 'pi-chart-bar',
     path: '/admin/analytics'

@@ -319,6 +319,11 @@
       </div>
     </div>
 
+    <!-- Data Objects Widget -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <DataObjectWidget />
+    </div>
+
     <!-- Plugin Widgets: Dashboard Bottom -->
     <div v-if="dashboardBottomWidgets.length > 0" class="space-y-6">
       <div
@@ -346,6 +351,7 @@ import { MockInvestmentApiService } from '../services/mockData'
 import type { InvestmentSummary, Investment } from '../types/investment'
 import type { PluginWidget } from '../types/plugin'
 import AlertsPanel from '../components/communications/AlertsPanel.vue'
+import DataObjectWidget from '../components/dynamic/DataObjectWidget.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
