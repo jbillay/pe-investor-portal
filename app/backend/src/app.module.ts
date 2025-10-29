@@ -9,6 +9,8 @@ import { EmailModule } from './email/email.module';
 import { InvestmentModule } from './investment/investment.module';
 import { FundModule } from './fund/fund.module';
 import { PluginModule } from './plugin/plugin.module';
+import { DataObjectsModule } from './data-objects/data-objects.module';
+import { DynamicDataModule } from './dynamic-data/dynamic-data.module';
 import { HealthController } from './health/health.controller';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
@@ -30,6 +32,8 @@ import { CommonServicesModule } from './common/services/common-services.module';
     InvestmentModule,
     FundModule,
     PluginModule,
+    DataObjectsModule,
+    DynamicDataModule,
   ],
   controllers: [HealthController],
   providers: [

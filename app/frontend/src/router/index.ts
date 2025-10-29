@@ -126,6 +126,48 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'admin/data-objects',
+        name: 'data-objects',
+        component: () => import('@views/admin/DataObjectManagerView.vue'),
+        meta: {
+          title: 'Data Objects',
+          requiresRole: 'SUPER_ADMIN'
+        }
+      },
+      {
+        path: 'admin/data-objects/:id',
+        name: 'data-object-edit',
+        component: () => import('@views/admin/DataObjectEditorView.vue'),
+        meta: {
+          title: 'Edit Data Object',
+          requiresRole: 'SUPER_ADMIN'
+        }
+      },
+      {
+        path: 'dynamic/:dataKey',
+        name: 'dynamic-list',
+        component: () => import('@views/DynamicListView.vue'),
+        meta: { title: 'Data' }
+      },
+      {
+        path: 'dynamic/:dataKey/create',
+        name: 'dynamic-create',
+        component: () => import('@views/DynamicFormView.vue'),
+        meta: { title: 'Create' }
+      },
+      {
+        path: 'dynamic/:dataKey/:id',
+        name: 'dynamic-detail',
+        component: () => import('@views/DynamicDetailView.vue'),
+        meta: { title: 'Details' }
+      },
+      {
+        path: 'dynamic/:dataKey/:id/edit',
+        name: 'dynamic-edit',
+        component: () => import('@views/DynamicFormView.vue'),
+        meta: { title: 'Edit' }
+      },
+      {
         path: 'plugins/:pluginId',
         name: 'plugin-view',
         component: () => import('@views/PluginView.vue'),
