@@ -54,6 +54,7 @@ export interface DataField {
   isMandatory: boolean;
   isReadOnly: boolean;
   defaultValue?: string;
+  relatedDataObjectId?: string;
   validationRules: ValidationRule[];
   dropdownOptions: DropdownOption[];
 }
@@ -94,6 +95,7 @@ export interface DynamicField {
   isMandatory: boolean;
   isReadOnly: boolean;
   defaultValue?: string;
+  relatedDataObjectId?: string;
   validationRules: ValidationRule[];
   dropdownOptions?: DropdownOption[];
 }
@@ -167,6 +169,7 @@ export interface CreateFieldDto {
   isMandatory: boolean;
   isReadOnly: boolean;
   defaultValue?: string;
+  relatedDataObjectId?: string;
   validationRules?: ValidationRule[];
   dropdownOptions?: DropdownOption[];
 }

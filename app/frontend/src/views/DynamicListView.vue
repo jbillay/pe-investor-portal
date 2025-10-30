@@ -6,13 +6,6 @@
           <h1 class="text-3xl font-bold text-gray-900">{{ schema?.name || 'Loading...' }}</h1>
           <p v-if="schema?.description" class="text-gray-600 mt-1">{{ schema.description }}</p>
         </div>
-        <Button
-          v-if="!loading && !schemaError"
-          label="Back to Admin"
-          icon="pi pi-arrow-left"
-          class="p-button-text"
-          @click="$router.push('/admin/data-objects')"
-        />
       </div>
     </div>
 
@@ -133,6 +126,7 @@ const instanceToDelete = ref<DynamicInstance | null>(null);
 
 onMounted(async () => {
   await fetchSchema();
+  console.log(canRead.value)
   if (canRead.value) {
     await fetchInstances({ page: 1, limit: 20 });
   }

@@ -4,7 +4,7 @@
       {{ field.name }}
       <span v-if="field.isMandatory" class="text-red-500">*</span>
     </label>
-    <Dropdown
+    <Select
       :id="field.fieldKey"
       :model-value="modelValue"
       @update:model-value="$emit('update:modelValue', $event)"
@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import Dropdown from 'primevue/dropdown';
+import Select from 'primevue/select';
 import type { DynamicField } from '@/types/dynamic-data';
 
 defineProps<{

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { SchemaService } from './schema.service';
 import { InstanceWithValues, PaginatedInstances } from '../entities/instance.entity';
@@ -8,10 +8,33 @@ import { Decimal } from '../../../generated/prisma/runtime/library';
 
 @Injectable()
 export class InstanceService {
+  private readonly UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly schemaService: SchemaService,
   ) {}
+
+  /**
+   * Validate UUID format
+   * @param uuid - UUID string to validate
+   * @returns true if valid, false otherwise
+   */
+  private isValidUUID(uuid: string): boolean {
+    return this.UUID_REGEX.test(uuid);
+  }
+
+  /**
+   * Validate and throw error if UUID is invalid
+   * @param uuid - UUID string to validate
+   * @param context - Context for error message
+   * @throws BadRequestException if UUID is invalid
+   */
+  private validateUUID(uuid: string, context: string): void {
+    if (!this.isValidUUID(uuid)) {
+      throw new BadRequestException(`Invalid UUID format in ${context}: ${uuid}`);
+    }
+  }
 
   /**
    * Create a new instance
@@ -33,6 +56,9 @@ export class InstanceService {
           updatedBy: userId,
         },
       });
+
+      // Validate generated UUID (paranoid check to prevent data corruption)
+      this.validateUUID(instance.id, 'instance creation');
 
       // Create field values
       for (const field of schema.fields) {
@@ -138,6 +164,9 @@ export class InstanceService {
     instanceId: string,
     tx?: any,
   ): Promise<InstanceWithValues> {
+    // Validate instance ID format before querying
+    this.validateUUID(instanceId, 'instance lookup');
+
     const schema = await this.schemaService.getSchema(dataKey);
     const prismaClient = tx || this.prisma;
 
@@ -239,6 +268,9 @@ export class InstanceService {
    * Delete an instance
    */
   async remove(dataKey: string, instanceId: string, userId: string): Promise<void> {
+    // Validate instance ID format before querying
+    this.validateUUID(instanceId, 'instance deletion');
+
     const schema = await this.schemaService.getSchema(dataKey);
 
     await this.prisma.$transaction(async (tx) => {

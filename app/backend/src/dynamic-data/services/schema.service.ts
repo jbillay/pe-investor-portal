@@ -140,6 +140,7 @@ export class SchemaService {
       isMandatory: field.isMandatory,
       isReadOnly: field.isReadOnly,
       defaultValue: field.defaultValue || undefined,
+      relatedDataObjectId: field.relatedDataObjectId || undefined,
       validationRules: field.validationRules.map((rule: any) => ({
         ruleType: rule.ruleType,
         ruleValue: rule.ruleValue,
@@ -175,6 +176,16 @@ export class SchemaService {
       },
     });
 
+    // Check if user has SUPER_ADMIN role - they have unlimited access to all dynamic data objects
+    const isSuperAdmin = userRoles.some((userRole) => userRole.role.name === 'SUPER_ADMIN' && userRole.role.isActive);
+    if (isSuperAdmin) {
+      return {
+        canRead: true,
+        canWrite: true,
+        canDelete: true,
+      };
+    }
+
     // Collect all permissions from all roles
     const permissions = new Set<string>();
     for (const userRole of userRoles) {
@@ -184,9 +195,9 @@ export class SchemaService {
     }
 
     return {
-      canRead: permissions.has(`${upperDataKey}:READ`),
-      canWrite: permissions.has(`${upperDataKey}:WRITE`),
-      canDelete: permissions.has(`${upperDataKey}:DELETE`),
+      canRead: permissions.has(`OBJ_${upperDataKey}:READ`),
+      canWrite: permissions.has(`OBJ_${upperDataKey}:WRITE`),
+      canDelete: permissions.has(`OBJ_${upperDataKey}:DELETE`),
     };
   }
 }

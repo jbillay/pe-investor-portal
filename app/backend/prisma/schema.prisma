@@ -591,9 +591,10 @@ model DataObject {
   updatedBy   String
 
   // Relations
-  versions    DataObjectVersion[]
-  fields      DataField[]
-  instances   DataObjectInstance[]
+  versions            DataObjectVersion[]
+  fields              DataField[] @relation("DataObjectFields")
+  relatedFields       DataField[] @relation("RelatedDataObject")  // Fields that reference this data object
+  instances           DataObjectInstance[]
 
   // Indexes
   @@index([dataKey])
@@ -623,33 +624,36 @@ model DataObjectVersion {
 
 // Data Field - Field definitions for each data object
 model DataField {
-  id              String   @id @default(uuid()) @db.Uuid
-  dataObjectId    String   @db.Uuid
-  name            String   @db.VarChar(255)
-  fieldKey        String   @db.VarChar(100)  // camelCase identifier
-  dataType        FieldDataType  // Enum of supported field types
-  fieldOrder      Int      @default(0)
-  description     String?  @db.Text
-  isMandatory     Boolean  @default(false)
-  isReadOnly      Boolean  @default(false)
-  isActive        Boolean  @default(true)
-  defaultValue    String?  @db.Text
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  createdBy       String
-  updatedBy       String
+  id                   String   @id @default(uuid()) @db.Uuid
+  dataObjectId         String   @db.Uuid
+  name                 String   @db.VarChar(255)
+  fieldKey             String   @db.VarChar(100)  // camelCase identifier
+  dataType             FieldDataType  // Enum of supported field types
+  fieldOrder           Int      @default(0)
+  description          String?  @db.Text
+  isMandatory          Boolean  @default(false)
+  isReadOnly           Boolean  @default(false)
+  isActive             Boolean  @default(true)
+  defaultValue         String?  @db.Text
+  relatedDataObjectId  String?  @db.Uuid  // For RELATIONSHIP fields - references another DataObject
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  createdBy            String
+  updatedBy            String
 
   // Relations
-  dataObject      DataObject @relation(fields: [dataObjectId], references: [id], onDelete: Cascade)
-  validationRules FieldValidationRule[]
-  dropdownOptions FieldDropdownOption[]
-  fieldValues     InstanceFieldValue[]
+  dataObject          DataObject  @relation("DataObjectFields", fields: [dataObjectId], references: [id], onDelete: Cascade)
+  relatedDataObject   DataObject? @relation("RelatedDataObject", fields: [relatedDataObjectId], references: [id], onDelete: SetNull)
+  validationRules     FieldValidationRule[]
+  dropdownOptions     FieldDropdownOption[]
+  fieldValues         InstanceFieldValue[]
 
   // Constraints
   @@unique([dataObjectId, fieldKey])
   @@index([dataObjectId])
   @@index([fieldKey])
   @@index([fieldOrder])
+  @@index([relatedDataObjectId])
   @@map("data_fields")
 }
 

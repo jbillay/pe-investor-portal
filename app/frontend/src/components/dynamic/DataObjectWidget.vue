@@ -13,7 +13,7 @@
         <label class="block text-sm font-medium text-gray-700 mb-2">
           Select Data Object
         </label>
-        <Dropdown
+        <Select
           v-model="selectedDataObject"
           :options="dataObjects"
           optionLabel="name"
@@ -41,7 +41,7 @@
               />
             </div>
           </template>
-        </Dropdown>
+        </Select>
       </div>
 
       <!-- Action Buttons -->
@@ -245,7 +245,7 @@ import type { DataObject, DynamicInstance, DynamicField, FieldDataType } from '@
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Dialog from 'primevue/dialog';
-import Dropdown from 'primevue/dropdown';
+import Select from 'primevue/select';
 import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
 import DynamicFormField from './fields/DynamicFormField.vue';
