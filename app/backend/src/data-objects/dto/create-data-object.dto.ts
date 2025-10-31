@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsInt, IsEnum, Min } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsInt, IsEnum, Min, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FieldDataType, ValidationRuleType } from '../../../generated/prisma';
@@ -68,6 +68,11 @@ export class CreateFieldDto {
   @IsOptional()
   @IsString()
   defaultValue?: string;
+
+  @ApiPropertyOptional({ description: 'For RELATIONSHIP fields - ID of the related data object' })
+  @IsOptional()
+  @IsUUID()
+  relatedDataObjectId?: string;
 
   @ApiPropertyOptional({ type: [ValidationRuleDto] })
   @IsOptional()

@@ -51,6 +51,11 @@ export class DynamicPermissionGuard implements CanActivate {
       throw new NotFoundException(`Data object with key '${dataKey}' not found`);
     }
 
+    // SUPER_ADMIN has unlimited access to all dynamic data objects
+    if (user.roles && user.roles.includes('SUPER_ADMIN')) {
+      return true;
+    }
+
     // Check user permissions
     const hasPermission = await this.checkPermission(
       user.id,

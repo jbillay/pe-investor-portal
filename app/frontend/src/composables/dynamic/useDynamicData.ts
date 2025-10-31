@@ -43,8 +43,8 @@ export function useDynamicData(dataKey: string) {
     error.value = null;
     try {
       const response = await api.get<DynamicSchema>(`/dynamic/${dataKey}/schema`);
-      schema.value = response.data;
-      return response.data;
+      schema.value = response;
+      return response;
     } catch (err: any) {
       error.value = err.message || 'Failed to fetch schema';
       throw err;
@@ -71,9 +71,9 @@ export function useDynamicData(dataKey: string) {
       const url = `/dynamic/${dataKey}?${queryParams.toString()}`;
       const response = await api.get<PaginatedInstances>(url);
 
-      instances.value = response.data.items;
-      pagination.value = response.data.pagination;
-      return response.data;
+      instances.value = response.items;
+      pagination.value = response.pagination;
+      return response;
     } catch (err: any) {
       instancesError.value = err.message || 'Failed to fetch instances';
       throw err;
@@ -87,8 +87,8 @@ export function useDynamicData(dataKey: string) {
     error.value = null;
     try {
       const response = await api.get<DynamicInstance>(`/dynamic/${dataKey}/${instanceId}`);
-      instance.value = response.data;
-      return response.data;
+      instance.value = response;
+      return response;
     } catch (err: any) {
       error.value = err.message || 'Failed to fetch instance';
       throw err;
@@ -102,8 +102,8 @@ export function useDynamicData(dataKey: string) {
     error.value = null;
     try {
       const response = await api.post<DynamicInstance>(`/dynamic/${dataKey}`, dto);
-      instances.value.unshift(response.data);
-      return response.data;
+      instances.value.unshift(response);
+      return response;
     } catch (err: any) {
       error.value = err.response?.data?.message || err.message || 'Failed to create instance';
       throw err;
@@ -119,12 +119,12 @@ export function useDynamicData(dataKey: string) {
       const response = await api.put<DynamicInstance>(`/dynamic/${dataKey}/${instanceId}`, dto);
       const index = instances.value.findIndex(inst => inst.id === instanceId);
       if (index !== -1) {
-        instances.value[index] = response.data;
+        instances.value[index] = response;
       }
       if (instance.value?.id === instanceId) {
-        instance.value = response.data;
+        instance.value = response;
       }
-      return response.data;
+      return response;
     } catch (err: any) {
       error.value = err.response?.data?.message || err.message || 'Failed to update instance';
       throw err;
@@ -162,9 +162,9 @@ export function useDynamicData(dataKey: string) {
         filters,
         ...params
       });
-      instances.value = response.data.items;
-      pagination.value = response.data.pagination;
-      return response.data;
+      instances.value = response.items;
+      pagination.value = response.pagination;
+      return response;
     } catch (err: any) {
       error.value = err.message || 'Failed to search instances';
       throw err;
@@ -200,7 +200,7 @@ export function useDynamicData(dataKey: string) {
 
       const url = `/dynamic/${dataKey}/export/json?${queryParams.toString()}`;
       const response = await api.get<any[]>(url);
-      return response.data;
+      return response;
     } catch (err: any) {
       error.value = err.message || 'Failed to export to JSON';
       throw err;
@@ -214,8 +214,8 @@ export function useDynamicData(dataKey: string) {
     error.value = null;
     try {
       const response = await api.get<ChangeLogEntry[]>(`/dynamic/${dataKey}/${instanceId}/history`);
-      changeHistory.value = response.data;
-      return response.data;
+      changeHistory.value = response;
+      return response;
     } catch (err: any) {
       error.value = err.message || 'Failed to fetch history';
       throw err;

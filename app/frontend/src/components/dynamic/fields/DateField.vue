@@ -4,7 +4,7 @@
       {{ field.name }}
       <span v-if="field.isMandatory" class="text-red-500">*</span>
     </label>
-    <Calendar
+    <DatePicker
       :id="field.fieldKey"
       :model-value="dateValue"
       @update:model-value="handleDateChange"
@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import Calendar from 'primevue/calendar';
+import DatePicker from 'primevue/datepicker';
 import type { DynamicField } from '@/types/dynamic-data';
 
 const props = defineProps<{

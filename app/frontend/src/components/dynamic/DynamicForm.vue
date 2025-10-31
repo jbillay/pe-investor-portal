@@ -75,31 +75,6 @@ const formData = ref<Record<string, any>>({});
 const errors = ref<Record<string, string>>({});
 const formError = ref<string | null>(null);
 
-// Initialize form data with initial values or defaults
-watch(
-  () => props.initialValues,
-  (values) => {
-    if (values) {
-      formData.value = { ...values };
-    } else {
-      // Initialize with empty values based on field types
-      formData.value = {};
-      props.schema.fields.forEach((field) => {
-        if (field.defaultValue !== undefined && field.defaultValue !== null) {
-          formData.value[field.fieldKey] = field.defaultValue;
-        } else {
-          formData.value[field.fieldKey] = getDefaultValue(field);
-        }
-      });
-    }
-  },
-  { immediate: true }
-);
-
-const sortedFields = computed(() =>
-  [...props.schema.fields].sort((a, b) => a.fieldOrder - b.fieldOrder)
-);
-
 const getDefaultValue = (field: DynamicField): any => {
   switch (field.dataType) {
     case FieldDataType.BOOLEAN:
@@ -111,11 +86,40 @@ const getDefaultValue = (field: DynamicField): any => {
       return [];
     case FieldDataType.DATE:
     case FieldDataType.DATETIME:
+    case FieldDataType.RELATIONSHIP:
       return null;
     default:
       return '';
   }
 };
+
+// Initialize form data with initial values or defaults
+watch(
+  () => props.initialValues,
+  (values) => {
+    // Initialize all fields with their default values first
+    formData.value = {};
+    props.schema.fields.forEach((field) => {
+      if (field.defaultValue !== undefined && field.defaultValue !== null) {
+        formData.value[field.fieldKey] = field.defaultValue;
+      } else {
+        formData.value[field.fieldKey] = getDefaultValue(field);
+      }
+    });
+
+    // Then override with any provided initial values
+    if (values) {
+      Object.keys(values).forEach((key) => {
+        formData.value[key] = values[key];
+      });
+    }
+  },
+  { immediate: true }
+);
+
+const sortedFields = computed(() =>
+  [...props.schema.fields].sort((a, b) => a.fieldOrder - b.fieldOrder)
+);
 
 const getFieldComponent = (dataType: FieldDataType) => {
   const componentMap: Record<FieldDataType, any> = {

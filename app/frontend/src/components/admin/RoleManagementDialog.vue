@@ -362,7 +362,7 @@
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Expiry Date <span class="text-red-500">*</span>
               </label>
-              <Calendar
+              <DatePicker
                 v-model="expiryDate"
                 dateFormat="mm/dd/yy"
                 :minDate="new Date()"
@@ -561,7 +561,7 @@ import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import Tag from 'primevue/tag';
 import Textarea from 'primevue/textarea';
-import Calendar from 'primevue/calendar';
+import DatePicker from 'primevue/datepicker';
 import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
 import ProgressSpinner from 'primevue/progressspinner';

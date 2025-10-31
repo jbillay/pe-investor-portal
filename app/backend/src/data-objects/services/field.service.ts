@@ -57,6 +57,7 @@ export class FieldService {
           isMandatory: fieldDto.isMandatory,
           isReadOnly: fieldDto.isReadOnly,
           defaultValue: fieldDto.defaultValue,
+          relatedDataObjectId: fieldDto.relatedDataObjectId,
           createdBy: userId,
           updatedBy: userId,
           validationRules: fieldDto.validationRules
@@ -127,6 +128,7 @@ export class FieldService {
           isMandatory: updateDto.isMandatory,
           isReadOnly: updateDto.isReadOnly,
           defaultValue: updateDto.defaultValue,
+          relatedDataObjectId: updateDto.relatedDataObjectId,
           updatedBy: userId,
         },
         include: {
@@ -297,6 +299,7 @@ export class FieldService {
         isMandatory: field.isMandatory,
         isReadOnly: field.isReadOnly,
         defaultValue: field.defaultValue,
+        relatedDataObjectId: field.relatedDataObjectId,
         validationRules: field.validationRules.map((rule: any) => ({
           ruleType: rule.ruleType,
           ruleValue: rule.ruleValue,

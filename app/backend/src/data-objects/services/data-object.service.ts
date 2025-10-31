@@ -1,8 +1,16 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateDataObjectDto } from '../dto/create-data-object.dto';
 import { UpdateDataObjectDto } from '../dto/update-data-object.dto';
-import { DataObjectWithFields, SchemaSnapshot } from '../entities/data-object.entity';
+import {
+  DataObjectWithFields,
+  SchemaSnapshot,
+} from '../entities/data-object.entity';
 
 @Injectable()
 export class DataObjectService {
@@ -13,18 +21,20 @@ export class DataObjectService {
    */
   async create(
     createDto: CreateDataObjectDto,
-    userId: string
+    userId: string,
   ): Promise<DataObjectWithFields> {
     // Generate dataKey from name if not provided
     const dataKey = createDto.dataKey || this.generateDataKey(createDto.name);
 
     // Check if dataKey already exists
     const existing = await this.prisma.dataObject.findUnique({
-      where: { dataKey }
+      where: { dataKey },
     });
 
     if (existing) {
-      throw new ConflictException(`Data object with key '${dataKey}' already exists`);
+      throw new ConflictException(
+        `Data object with key '${dataKey}' already exists`,
+      );
     }
 
     // Create data object with fields in a transaction
@@ -43,7 +53,8 @@ export class DataObjectService {
       // Create fields if provided
       if (createDto.fields && createDto.fields.length > 0) {
         for (const fieldDto of createDto.fields) {
-          const fieldKey = fieldDto.fieldKey || this.generateFieldKey(fieldDto.name);
+          const fieldKey =
+            fieldDto.fieldKey || this.generateFieldKey(fieldDto.name);
 
           await tx.dataField.create({
             data: {
@@ -56,6 +67,7 @@ export class DataObjectService {
               isMandatory: fieldDto.isMandatory,
               isReadOnly: fieldDto.isReadOnly,
               defaultValue: fieldDto.defaultValue,
+              relatedDataObjectId: fieldDto.relatedDataObjectId,
               createdBy: userId,
               updatedBy: userId,
               validationRules: fieldDto.validationRules
@@ -82,7 +94,10 @@ export class DataObjectService {
       }
 
       // Create version 1 with schema snapshot
-      const schemaSnapshot = await this.generateSchemaSnapshot(dataObject.id, tx);
+      const schemaSnapshot = await this.generateSchemaSnapshot(
+        dataObject.id,
+        tx,
+      );
       await tx.dataObjectVersion.create({
         data: {
           dataObjectId: dataObject.id,
@@ -98,7 +113,7 @@ export class DataObjectService {
       await this.createPermissions(dataKey, tx);
 
       // Return the complete data object with fields
-      return await tx.dataObject.findUnique({
+      return (await tx.dataObject.findUnique({
         where: { id: dataObject.id },
         include: {
           fields: {
@@ -109,7 +124,7 @@ export class DataObjectService {
             orderBy: { fieldOrder: 'asc' },
           },
         },
-      }) as DataObjectWithFields;
+      })) as DataObjectWithFields;
     });
   }
 
@@ -133,7 +148,7 @@ export class DataObjectService {
         },
         _count: {
           select: {
-            fields: true,
+            fields: { where: { isActive: true } },
             instances: true,
           },
         },
@@ -210,7 +225,7 @@ export class DataObjectService {
   async update(
     id: string,
     updateDto: UpdateDataObjectDto,
-    userId: string
+    userId: string,
   ): Promise<DataObjectWithFields> {
     const existing = await this.findOne(id);
 
@@ -246,7 +261,7 @@ export class DataObjectService {
         },
       });
 
-      return await tx.dataObject.findUnique({
+      return (await tx.dataObject.findUnique({
         where: { id },
         include: {
           fields: {
@@ -261,7 +276,7 @@ export class DataObjectService {
             orderBy: { fieldOrder: 'asc' },
           },
         },
-      }) as DataObjectWithFields;
+      })) as DataObjectWithFields;
     });
   }
 
@@ -278,13 +293,19 @@ export class DataObjectService {
 
     if (instanceCount > 0) {
       throw new BadRequestException(
-        `Cannot delete data object with ${instanceCount} existing instances. Delete instances first.`
+        `Cannot delete data object with ${instanceCount} existing instances. Delete instances first.`,
       );
     }
 
-    await this.prisma.dataObject.update({
-      where: { id },
-      data: { isActive: false },
+    await this.prisma.$transaction(async (tx) => {
+      // Soft delete the data object
+      await tx.dataObject.update({
+        where: { id },
+        data: { isActive: false },
+      });
+
+      // Delete associated permissions
+      await this.deletePermissions(dataObject.dataKey, tx);
     });
   }
 
@@ -314,7 +335,9 @@ export class DataObjectService {
     });
 
     if (!versionRecord) {
-      throw new NotFoundException(`Version ${version} not found for data object ${id}`);
+      throw new NotFoundException(
+        `Version ${version} not found for data object ${id}`,
+      );
     }
 
     return versionRecord;
@@ -342,7 +365,10 @@ export class DataObjectService {
   /**
    * Helper: Generate schema snapshot for versioning
    */
-  private async generateSchemaSnapshot(dataObjectId: string, tx: any): Promise<SchemaSnapshot> {
+  private async generateSchemaSnapshot(
+    dataObjectId: string,
+    tx: any,
+  ): Promise<SchemaSnapshot> {
     const dataObject = await tx.dataObject.findUnique({
       where: { id: dataObjectId },
       include: {
@@ -381,6 +407,7 @@ export class DataObjectService {
         isMandatory: field.isMandatory,
         isReadOnly: field.isReadOnly,
         defaultValue: field.defaultValue,
+        relatedDataObjectId: field.relatedDataObjectId,
         validationRules: field.validationRules.map((rule: any) => ({
           ruleType: rule.ruleType,
           ruleValue: rule.ruleValue,
@@ -402,19 +429,19 @@ export class DataObjectService {
     const upperDataKey = dataKey.toUpperCase();
     const permissions = [
       {
-        name: `${upperDataKey}:READ`,
+        name: `OBJ_${upperDataKey}:READ`,
         description: `View ${dataKey} instances`,
         resource: dataKey,
         action: 'READ',
       },
       {
-        name: `${upperDataKey}:WRITE`,
+        name: `OBJ_${upperDataKey}:WRITE`,
         description: `Create and edit ${dataKey} instances`,
         resource: dataKey,
         action: 'WRITE',
       },
       {
-        name: `${upperDataKey}:DELETE`,
+        name: `OBJ_${upperDataKey}:DELETE`,
         description: `Delete ${dataKey} instances`,
         resource: dataKey,
         action: 'DELETE',
@@ -428,5 +455,37 @@ export class DataObjectService {
         create: permission,
       });
     }
+  }
+
+  /**
+   * Helper: Delete permissions for data object
+   */
+  private async deletePermissions(dataKey: string, tx: any): Promise<void> {
+    const upperDataKey = dataKey.toUpperCase();
+    const permissionNames = [
+      `OBJ_${upperDataKey}:READ`,
+      `OBJ_${upperDataKey}:WRITE`,
+      `OBJ_${upperDataKey}:DELETE`,
+    ];
+
+    // Delete role_permissions first (cascade delete)
+    await tx.rolePermission.deleteMany({
+      where: {
+        permission: {
+          name: {
+            in: permissionNames,
+          },
+        },
+      },
+    });
+
+    // Delete permissions
+    await tx.permission.deleteMany({
+      where: {
+        name: {
+          in: permissionNames,
+        },
+      },
+    });
   }
 }

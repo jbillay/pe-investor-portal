@@ -108,6 +108,10 @@
                   <div class="flex gap-4 text-sm text-gray-500">
                     <span>Type: <strong>{{ formatFieldType(field.dataType) }}</strong></span>
                     <span>Order: <strong>{{ field.fieldOrder }}</strong></span>
+                    <span v-if="field.relatedDataObjectId" class="flex items-center gap-1">
+                      <i class="pi pi-link text-blue-600"></i>
+                      Links to: <strong>{{ getRelatedDataObjectName(field.relatedDataObjectId) }}</strong>
+                    </span>
                     <span v-if="field.validationRules.length">
                       Validations: <strong>{{ field.validationRules.length }}</strong>
                     </span>
@@ -177,7 +181,7 @@
         <div class="grid grid-cols-2 gap-4">
           <div class="field">
             <label for="dataType" class="font-semibold mb-2 block">Field Type *</label>
-            <Dropdown
+            <Select
               id="dataType"
               v-model="fieldForm.dataType"
               :options="fieldTypeOptions"
@@ -199,6 +203,39 @@
               :min="0"
             />
           </div>
+        </div>
+
+        <!-- Related Data Object (for RELATIONSHIP type) -->
+        <div v-if="isRelationshipType" class="field">
+          <label for="relatedDataObject" class="font-semibold mb-2 block">Related Data Object *</label>
+          <Select
+            id="relatedDataObject"
+            v-model="fieldForm.relatedDataObjectId"
+            :options="availableDataObjects"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="Select data object to link to"
+            class="w-full"
+            :class="{ 'p-invalid': fieldErrors.relatedDataObjectId }"
+            :filter="true"
+            :show-clear="false"
+          >
+            <template #option="slotProps">
+              <div class="flex items-center gap-2">
+                <i class="pi pi-database text-blue-600"></i>
+                <div>
+                  <div class="font-semibold">{{ slotProps.option.name }}</div>
+                  <small class="text-gray-500">{{ slotProps.option.dataKey }}</small>
+                </div>
+              </div>
+            </template>
+          </Select>
+          <small class="text-gray-500 block mt-1">
+            Select which data object instances this field can link to
+          </small>
+          <small v-if="fieldErrors.relatedDataObjectId" class="p-error block mt-1">
+            {{ fieldErrors.relatedDataObjectId }}
+          </small>
         </div>
 
         <div class="field">
@@ -285,7 +322,7 @@
               :key="index"
               class="grid grid-cols-12 gap-2"
             >
-              <Dropdown
+              <Select
                 v-model="rule.ruleType"
                 :options="validationRuleOptions"
                 optionLabel="label"
@@ -429,7 +466,7 @@ import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
 import Textarea from 'primevue/textarea';
-import Dropdown from 'primevue/dropdown';
+import Select from 'primevue/select';
 import Checkbox from 'primevue/checkbox';
 import Tag from 'primevue/tag';
 import Message from 'primevue/message';
@@ -439,9 +476,11 @@ import AdminNavigation from '@/components/admin/AdminNavigation.vue';
 const route = useRoute();
 const router = useRouter();
 const {
+  dataObjects,
   currentDataObject,
   loading,
   error,
+  fetchDataObjects,
   fetchDataObject,
   updateDataObject,
   addField,
@@ -465,6 +504,7 @@ const fieldForm = ref<CreateFieldDto>({
   isMandatory: false,
   isReadOnly: false,
   defaultValue: '',
+  relatedDataObjectId: undefined,
   validationRules: [],
   dropdownOptions: []
 });
@@ -535,9 +575,21 @@ const isSelectType = computed(() => {
          fieldForm.value.dataType === FieldDataType.MULTI_SELECT;
 });
 
+const isRelationshipType = computed(() => {
+  return fieldForm.value.dataType === FieldDataType.RELATIONSHIP;
+});
+
+const availableDataObjects = computed(() => {
+  // Filter out the current data object to prevent self-referential relationships
+  return dataObjects.value.filter(obj => obj.id !== currentDataObject.value?.id);
+});
+
 onMounted(async () => {
   const id = route.params.id as string;
-  await fetchDataObject(id);
+  await Promise.all([
+    fetchDataObject(id),
+    fetchDataObjects() // Fetch all data objects for relationship field selection
+  ]);
 });
 
 const goBack = () => {
@@ -577,6 +629,7 @@ const openFieldDialog = (field?: DataField) => {
       isMandatory: field.isMandatory,
       isReadOnly: field.isReadOnly,
       defaultValue: field.defaultValue,
+      relatedDataObjectId: field.relatedDataObjectId,
       validationRules: [...field.validationRules],
       dropdownOptions: [...field.dropdownOptions]
     };
@@ -598,6 +651,10 @@ const validateFieldForm = (): boolean => {
 
   if (!fieldForm.value.dataType) {
     fieldErrors.value.dataType = 'Field type is required';
+  }
+
+  if (fieldForm.value.dataType === FieldDataType.RELATIONSHIP && !fieldForm.value.relatedDataObjectId) {
+    fieldErrors.value.relatedDataObjectId = 'Related data object is required for relationship fields';
   }
 
   return Object.keys(fieldErrors.value).length === 0;
@@ -646,6 +703,7 @@ const resetFieldForm = () => {
     isMandatory: false,
     isReadOnly: false,
     defaultValue: '',
+    relatedDataObjectId: undefined,
     validationRules: [],
     dropdownOptions: []
   };
@@ -685,6 +743,10 @@ const removeRule = (index: number) => {
 
 const formatFieldType = (type: string): string => {
   return fieldTypeOptions.find(opt => opt.value === type)?.label || type;
+};
+
+const getRelatedDataObjectName = (id: string): string => {
+  return dataObjects.value.find(obj => obj.id === id)?.name || 'Unknown';
 };
 
 const getFieldTypeIcon = (type: string): string => {
