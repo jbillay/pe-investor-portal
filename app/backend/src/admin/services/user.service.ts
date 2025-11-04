@@ -1494,7 +1494,7 @@ export class UserService {
 
   private async getUserStats(userId: string) {
     // Get user statistics
-    const [loginCount, lastActivity, investmentData] = await Promise.all([
+    const [loginCount, lastActivity] = await Promise.all([
       this.prisma.auditLog.count({
         where: {
           userId,
@@ -1505,11 +1505,6 @@ export class UserService {
         where: { userId },
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true }
-      }),
-      this.prisma.investment.aggregate({
-        where: { userId },
-        _count: true,
-        _sum: { commitmentAmount: true }
       })
     ]);
 
@@ -1524,9 +1519,7 @@ export class UserService {
     return {
       loginCount,
       lastActivityAt: lastActivity?.createdAt?.toISOString(),
-      accountAge,
-      investmentCount: investmentData._count || 0,
-      totalInvestmentValue: Number(investmentData._sum.commitmentAmount) || 0
+      accountAge
     };
   }
 

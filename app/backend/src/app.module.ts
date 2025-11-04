@@ -5,8 +5,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { EmailModule } from './email/email.module';
-import { InvestmentModule } from './investment/investment.module';
-import { FundModule } from './fund/fund.module';
 import { PluginModule } from './plugin/plugin.module';
 import { DataObjectsModule } from './data-objects/data-objects.module';
 import { DynamicDataModule } from './dynamic-data/dynamic-data.module';
@@ -30,8 +28,6 @@ import { CommonServicesModule } from './common/services/common-services.module';
     AuthModule,
     AdminModule,
     EmailModule,
-    InvestmentModule,
-    FundModule,
     PluginModule,
     DataObjectsModule,
     DynamicDataModule,

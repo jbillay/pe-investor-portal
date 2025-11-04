@@ -31,8 +31,6 @@ export interface UserStats {
   loginCount: number;
   lastActivityAt?: string;
   accountAge: number;
-  investmentCount?: number;
-  totalInvestmentValue?: number;
 }
 
 export interface DetailedUserResponseDto extends UserResponseDto {

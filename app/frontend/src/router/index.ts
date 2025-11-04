@@ -41,40 +41,10 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Search' }
       },
       {
-        path: 'documents',
-        name: 'documents',
-        component: () => import('@views/DocumentsView.vue'),
-        meta: { title: 'Documents' }
-      },
-      {
-        path: 'portfolio',
-        name: 'portfolio',
-        component: () => import('@views/PortfolioView.vue'),
-        meta: { title: 'Portfolio' }
-      },
-      {
-        path: 'capital-activity',
-        name: 'capital-activity',
-        component: () => import('@views/CapitalActivityView.vue'),
-        meta: { title: 'Capital Activity' }
-      },
-      {
         path: 'settings',
         name: 'settings',
         component: () => import('@views/SettingsView.vue'),
         meta: { title: 'Settings' }
-      },
-      {
-        path: 'contact',
-        name: 'contact',
-        component: () => import('@views/ContactView.vue'),
-        meta: { title: 'Contact' }
-      },
-      {
-        path: 'communications',
-        name: 'communications',
-        component: () => import('@views/CommunicationsView.vue'),
-        meta: { title: 'Communications' }
       },
       {
         path: 'admin',
