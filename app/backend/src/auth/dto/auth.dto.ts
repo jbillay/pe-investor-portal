@@ -7,6 +7,7 @@ import {
   IsUUID,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SanitizeEmail, Sanitize, TrimString } from '../../common/decorators/sanitize.decorator';
 
 export class LoginDto {
   @ApiProperty({
@@ -14,6 +15,7 @@ export class LoginDto {
     example: 'john.doe@example.com',
     format: 'email',
   })
+  @SanitizeEmail()
   @IsEmail()
   @IsNotEmpty()
   email: string;
@@ -23,6 +25,7 @@ export class LoginDto {
     example: 'SecurePassword123',
     minLength: 8,
   })
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   @MinLength(8)
@@ -35,6 +38,7 @@ export class RegisterDto {
     example: 'jane.smith@example.com',
     format: 'email',
   })
+  @SanitizeEmail()
   @IsEmail()
   @IsNotEmpty()
   email: string;
@@ -44,6 +48,7 @@ export class RegisterDto {
     example: 'SecurePassword123',
     minLength: 8,
   })
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   @MinLength(8)
@@ -53,6 +58,7 @@ export class RegisterDto {
     description: 'User first name',
     example: 'Jane',
   })
+  @Sanitize()
   @IsString()
   @IsNotEmpty()
   firstName: string;
@@ -61,6 +67,7 @@ export class RegisterDto {
     description: 'User last name',
     example: 'Smith',
   })
+  @Sanitize()
   @IsString()
   @IsNotEmpty()
   lastName: string;
@@ -71,6 +78,7 @@ export class RefreshTokenDto {
     description: 'Refresh token for getting new access token',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   refreshToken: string;
@@ -124,6 +132,7 @@ export class LogoutDto {
     description: 'Refresh token to revoke',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   refreshToken: string;

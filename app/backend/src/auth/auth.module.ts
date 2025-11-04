@@ -27,14 +27,34 @@ import { PrismaService } from '../common/prisma/prisma.service';
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        throttlers: [
-          {
-            ttl: configService.get<number>('THROTTLE_TTL', 60000),
-            limit: configService.get<number>('THROTTLE_LIMIT', 10),
-          },
-        ],
-      }),
+      useFactory: async (configService: ConfigService) => {
+        return {
+          throttlers: [
+            {
+              name: 'default',
+              ttl: configService.get<number>('THROTTLE_TTL', 60000),
+              limit: configService.get<number>('THROTTLE_LIMIT', 100),
+            },
+            {
+              name: 'short',
+              ttl: 1000, // 1 second
+              limit: 3,
+            },
+            {
+              name: 'medium',
+              ttl: 10000, // 10 seconds
+              limit: 20,
+            },
+            {
+              name: 'long',
+              ttl: 60000, // 1 minute
+              limit: 100,
+            },
+          ],
+          // Using in-memory storage (default) for rate limiting
+          // For production with multiple instances, consider Redis storage
+        };
+      },
       inject: [ConfigService],
     }),
   ],

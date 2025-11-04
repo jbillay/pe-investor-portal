@@ -2,7 +2,6 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { EmailModule } from './email/email.module';
@@ -13,8 +12,10 @@ import { DataObjectsModule } from './data-objects/data-objects.module';
 import { DynamicDataModule } from './dynamic-data/dynamic-data.module';
 import { HealthController } from './health/health.controller';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { IpThrottlerGuard } from './common/guards/ip-throttler.guard';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
 import { LoggingMiddleware } from './common/middleware/logging.middleware';
+import { CsrfMiddleware } from './common/middleware/csrf.middleware';
 import { PrismaService } from './common/prisma/prisma.service';
 import { CommonServicesModule } from './common/services/common-services.module';
 
@@ -44,14 +45,14 @@ import { CommonServicesModule } from './common/services/common-services.module';
     },
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: IpThrottlerGuard, // Use IP-based throttling instead of route-based
     },
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply(SecurityMiddleware, LoggingMiddleware)
+      .apply(SecurityMiddleware, LoggingMiddleware, CsrfMiddleware)
       .forRoutes('*');
   }
 }

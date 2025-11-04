@@ -55,10 +55,16 @@ export class EmailTemplateApiService {
     }
 
     if (error.response?.data?.message) {
+      // Log the full error response for debugging
+      console.error('[API Error] Full response:', error.response.data);
+      if (error.response.data.errors) {
+        console.error('[API Error] Validation errors:', error.response.data.errors);
+      }
+
       throw new EmailTemplateApiServiceError(
         error.response.data.message,
         error.response.data.code || 'API_ERROR',
-        error.response.data.details
+        error.response.data.errors || error.response.data.details
       );
     }
 
@@ -274,13 +280,46 @@ export class EmailTemplateApiService {
    * @param variables - Variables to substitute in the template
    * @returns Promise<TemplatePreviewResponse> - The rendered template
    */
-  async previewTemplate(templateId: string, variables?: Record<string, any>): Promise<TemplatePreviewResponse> {
+  async previewTemplate(templateId: string, variables?: Record<string, any>, variableSchema?: any[]): Promise<TemplatePreviewResponse> {
     try {
       if (!templateId?.trim()) {
         throw new EmailTemplateApiServiceError('Template ID is required', 'INVALID_TEMPLATE_ID');
       }
 
-      const payload: TemplatePreviewDto = { variables: variables || {} };
+      // Filter out empty string values and convert types based on schema
+      const filteredVariables: Record<string, any> = {};
+      if (variables) {
+        Object.entries(variables).forEach(([key, value]) => {
+          // Skip empty, null, or undefined values
+          if (value === '' || value === null || value === undefined) {
+            return;
+          }
+
+          // Find the variable schema to determine expected type
+          const schema = variableSchema?.find((v: any) => v.name === key);
+
+          if (schema) {
+            // Convert string numbers to actual numbers for number/currency types
+            if ((schema.type === 'number' || schema.type === 'currency') && typeof value === 'string') {
+              const numValue = Number(value);
+              if (!isNaN(numValue)) {
+                filteredVariables[key] = numValue;
+              } else {
+                filteredVariables[key] = value; // Keep original if conversion fails
+              }
+            } else {
+              filteredVariables[key] = value;
+            }
+          } else {
+            // No schema found, keep as-is
+            filteredVariables[key] = value;
+          }
+        });
+      }
+
+      const payload: TemplatePreviewDto = { variables: filteredVariables };
+      console.log('[Preview] Sending payload:', JSON.stringify(payload, null, 2));
+
       const response = await apiClient.post<TemplatePreviewResponse>(
         `${this.baseUrl}/${templateId}/preview`,
         payload
@@ -308,7 +347,8 @@ export class EmailTemplateApiService {
   async sendTestEmail(
     templateId: string,
     recipientEmail: string,
-    variables?: Record<string, any>
+    variables?: Record<string, any>,
+    variableSchema?: any[]
   ): Promise<EmailSendResult> {
     try {
       if (!templateId?.trim()) {
@@ -319,9 +359,40 @@ export class EmailTemplateApiService {
         throw new EmailTemplateApiServiceError('Recipient email is required', 'INVALID_EMAIL');
       }
 
+      // Filter out empty string values and convert types based on schema
+      const filteredVariables: Record<string, any> = {};
+      if (variables) {
+        Object.entries(variables).forEach(([key, value]) => {
+          // Skip empty, null, or undefined values
+          if (value === '' || value === null || value === undefined) {
+            return;
+          }
+
+          // Find the variable schema to determine expected type
+          const schema = variableSchema?.find((v: any) => v.name === key);
+
+          if (schema) {
+            // Convert string numbers to actual numbers for number/currency types
+            if ((schema.type === 'number' || schema.type === 'currency') && typeof value === 'string') {
+              const numValue = Number(value);
+              if (!isNaN(numValue)) {
+                filteredVariables[key] = numValue;
+              } else {
+                filteredVariables[key] = value; // Keep original if conversion fails
+              }
+            } else {
+              filteredVariables[key] = value;
+            }
+          } else {
+            // No schema found, keep as-is
+            filteredVariables[key] = value;
+          }
+        });
+      }
+
       const payload: SendTestEmailDto = {
         recipientEmail,
-        variables: variables || {},
+        variables: filteredVariables,
       };
 
       const response = await apiClient.post<EmailSendResult>(

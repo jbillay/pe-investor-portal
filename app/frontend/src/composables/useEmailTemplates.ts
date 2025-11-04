@@ -317,12 +317,12 @@ export function useEmailTemplates(): UseEmailTemplatesReturn {
   /**
    * Previews a template with variable substitution
    */
-  const previewTemplate = async (templateId: string, variables?: Record<string, any>): Promise<TemplatePreviewResponse | null> => {
+  const previewTemplate = async (templateId: string, variables?: Record<string, any>, variableSchema?: any[]): Promise<TemplatePreviewResponse | null> => {
     try {
       state.loading = true;
       state.error = null;
 
-      const preview = await emailTemplateApiService.previewTemplate(templateId, variables);
+      const preview = await emailTemplateApiService.previewTemplate(templateId, variables, variableSchema);
 
       return preview;
     } catch (error) {
@@ -339,13 +339,14 @@ export function useEmailTemplates(): UseEmailTemplatesReturn {
   const sendTestEmail = async (
     templateId: string,
     recipientEmail: string,
-    variables?: Record<string, any>
+    variables?: Record<string, any>,
+    variableSchema?: any[]
   ): Promise<EmailSendResult | null> => {
     try {
       state.loading = true;
       state.error = null;
 
-      const result = await emailTemplateApiService.sendTestEmail(templateId, recipientEmail, variables);
+      const result = await emailTemplateApiService.sendTestEmail(templateId, recipientEmail, variables, variableSchema);
 
       if (result.success) {
         showSuccess('Test Email Sent', `Test email has been sent to ${recipientEmail}.`);

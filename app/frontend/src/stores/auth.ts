@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { apiClient } from '@composables/useApi';
+import { useCsrf } from '@/composables/useCsrf';
 import type {
   User,
   LoginCredentials,
@@ -200,6 +201,10 @@ export const useAuthStore = defineStore('auth', () => {
       // Continue with logout even if API call fails
       console.warn('Logout API call failed:', err);
     } finally {
+      // Clear CSRF token
+      const { clearCsrfToken } = useCsrf();
+      clearCsrfToken();
+
       // Clear state and localStorage
       user.value = null;
       accessToken.value = null;

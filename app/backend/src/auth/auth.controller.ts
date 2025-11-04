@@ -387,6 +387,37 @@ export class AuthController {
     return this.passwordService.setPassword(user.id, setPasswordDto);
   }
 
+  @ApiOperation({
+    summary: 'Get CSRF token',
+    description:
+      'Get a CSRF token for submitting state-changing requests. ' +
+      'The token is automatically set in an httpOnly cookie and must be included ' +
+      'in the X-CSRF-Token header for POST/PUT/DELETE/PATCH requests.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'CSRF token generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        csrfToken: {
+          type: 'string',
+          example: 'a1b2c3d4e5f6...',
+          description: 'CSRF token to include in X-CSRF-Token header',
+        },
+      },
+    },
+  })
+  @Public()
+  @Get('csrf')
+  @HttpCode(HttpStatus.OK)
+  getCsrfToken(@Req() req: Request): { csrfToken: string } {
+    // The csrfTokenGenerator function is provided by csrf-csrf middleware
+    // It generates a token and automatically sets it in an httpOnly cookie
+    const csrfToken = (req as any).csrfToken ? (req as any).csrfToken() : '';
+    return { csrfToken };
+  }
+
   private getClientIp(req: Request): string {
     return (
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||

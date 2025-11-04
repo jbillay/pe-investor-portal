@@ -1,6 +1,7 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import { useAuthStore } from '@stores/auth'
 import type { ApiResponse } from '@/types/api'
+import { useCsrf } from '@/composables/useCsrf'
 
 class ApiClient {
   private instance: AxiosInstance
@@ -10,6 +11,7 @@ class ApiClient {
     this.instance = axios.create({
       baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5173/api',
       timeout: 10000,
+      withCredentials: true, // Required to send cookies (including CSRF cookie)
       headers: {
         'Content-Type': 'application/json',
       },
@@ -19,7 +21,7 @@ class ApiClient {
   }
 
   private setupInterceptors() {
-    // Request interceptor to add auth token
+    // Request interceptor to add auth token and CSRF token
     this.instance.interceptors.request.use(
       async (config) => {
         // Don't wait for refresh on logout requests to prevent circular dependency
@@ -45,10 +47,28 @@ class ApiClient {
           }
         }
 
+        // Add auth token
         const authStore = useAuthStore()
         if (authStore.accessToken) {
           config.headers.Authorization = `Bearer ${authStore.accessToken}`
         }
+
+        // Add CSRF token for state-changing requests (POST, PUT, PATCH, DELETE)
+        const isStateChangingRequest = ['post', 'put', 'patch', 'delete'].includes(
+          config.method?.toLowerCase() || ''
+        )
+
+        if (isStateChangingRequest) {
+          const { getCsrfToken } = useCsrf()
+          try {
+            const csrfToken = await getCsrfToken()
+            config.headers['x-csrf-token'] = csrfToken
+          } catch (error) {
+            console.error('[API] Failed to get CSRF token:', error)
+            // Continue without CSRF token - the backend will reject if needed
+          }
+        }
+
         return config
       },
       (error) => Promise.reject(error)

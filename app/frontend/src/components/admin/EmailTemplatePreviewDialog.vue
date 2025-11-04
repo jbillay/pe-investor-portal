@@ -502,7 +502,8 @@ const loadPreview = async () => {
 
   try {
     previewLoading.value = true;
-    const preview = await previewTemplate(props.template.id, variableValues.value);
+    // Pass the template's variable schema for proper type conversion
+    const preview = await previewTemplate(props.template.id, variableValues.value, props.template.variables);
 
     if (preview) {
       renderedSubject.value = preview.subject;
@@ -556,7 +557,8 @@ const sendTestEmail = async () => {
     sendTestError.value = '';
     sendTestSuccess.value = false;
 
-    await sendTestEmailAction(props.template.id, testEmailRecipient.value, variableValues.value);
+    // Pass the template's variable schema for proper type conversion
+    await sendTestEmailAction(props.template.id, testEmailRecipient.value, variableValues.value, props.template.variables);
 
     sendTestSuccess.value = true;
     setTimeout(() => {
