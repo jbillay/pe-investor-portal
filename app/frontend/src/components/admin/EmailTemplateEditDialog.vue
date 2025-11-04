@@ -422,10 +422,6 @@ const errors = ref<Record<string, string>>({});
  */
 const categoryOptions = [
   { label: 'Account', value: EmailCategory.ACCOUNT },
-  { label: 'Document', value: EmailCategory.DOCUMENT },
-  { label: 'Capital Call', value: EmailCategory.CAPITAL_CALL },
-  { label: 'Distribution', value: EmailCategory.DISTRIBUTION },
-  { label: 'Investment', value: EmailCategory.INVESTMENT },
   { label: 'System', value: EmailCategory.SYSTEM },
   { label: 'Notification', value: EmailCategory.NOTIFICATION },
   { label: 'Compliance', value: EmailCategory.COMPLIANCE },

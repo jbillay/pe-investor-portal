@@ -516,8 +516,8 @@ const editForm = ref({
 
 const fieldErrors = ref<Record<string, string>>({});
 
-// Breadcrumb
-const breadcrumbItems = ref([
+// Breadcrumb - using computed to reactively update when currentDataObject changes
+const breadcrumbItems = computed(() => [
   {
     label: 'Dashboard',
     icon: 'pi pi-home',

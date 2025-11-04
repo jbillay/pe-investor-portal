@@ -177,11 +177,17 @@ export const usePluginRegistryStore = defineStore('pluginRegistry', () => {
 
       console.log(`Plugin ${pluginId} loaded successfully`);
 
-      // Execute onInstall hook if defined
-      if (plugin.manifest.hooks?.onInstall && pluginModule.onInstall) {
-        console.log(`Executing onInstall hook for ${pluginId}`);
+      // Execute onInstall hook only once (on first load after installation)
+      // Check if onInstall has already been executed for this plugin
+      const installFlagKey = `plugin_${pluginId}_onInstall_executed`;
+      const hasExecutedOnInstall = localStorage.getItem(installFlagKey) === 'true';
+
+      if (plugin.manifest.hooks?.onInstall && pluginModule.onInstall && !hasExecutedOnInstall) {
+        console.log(`Executing onInstall hook for ${pluginId} (first time)`);
         try {
           await pluginModule.onInstall();
+          // Mark onInstall as executed so it doesn't run again
+          localStorage.setItem(installFlagKey, 'true');
         } catch (hookError) {
           console.error(`onInstall hook failed for ${pluginId}:`, hookError);
           // Don't fail the entire load if hook fails
@@ -237,6 +243,10 @@ export const usePluginRegistryStore = defineStore('pluginRegistry', () => {
         console.error(`onUninstall hook failed for ${pluginId}:`, hookError);
       }
     }
+
+    // Clear onInstall flag so it will run again if plugin is reinstalled
+    const installFlagKey = `plugin_${pluginId}_onInstall_executed`;
+    localStorage.removeItem(installFlagKey);
 
     loadedPlugins.value.delete(pluginId);
     console.log(`Plugin ${pluginId} unloaded`);

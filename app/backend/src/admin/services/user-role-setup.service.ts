@@ -171,11 +171,10 @@ export class UserRoleSetupService {
     confidence: number;
   }> {
     try {
-      // Get user's investment and activity data
+      // Get user's activity data
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         include: {
-          investments: true,
           userRoles: {
             include: {
               role: true,
@@ -188,19 +187,23 @@ export class UserRoleSetupService {
         throw new Error('User not found');
       }
 
-      // Simple role recommendation logic
-      let recommendedRole = 'INVESTOR';
+      // Simple role recommendation logic based on existing roles
+      let recommendedRole = 'USER';
       let reason = 'Default role for new users';
       let confidence = 0.8;
 
-      // If user has many investments or high amounts, could be upgraded
-      if (user.investments.length >= 10) {
-        recommendedRole = 'FUND_MANAGER';
-        reason = 'User has significant investment activity';
+      // Check if user already has admin-level roles
+      const hasAdminRole = user.userRoles.some(ur =>
+        ['SUPER_ADMIN', 'ADMIN'].includes(ur.role.name)
+      );
+
+      if (hasAdminRole) {
+        recommendedRole = 'SUPER_ADMIN';
+        reason = 'User already has administrative privileges';
         confidence = 0.9;
-      } else if (user.investments.length >= 5) {
-        recommendedRole = 'ANALYST';
-        reason = 'User has moderate investment activity';
+      } else if (user.userRoles.length > 0) {
+        recommendedRole = user.userRoles[0].role.name;
+        reason = 'Based on current role assignment';
         confidence = 0.7;
       }
 
