@@ -38,45 +38,10 @@ const navigationItems = computed(() => {
       label: 'Dashboard',
       icon: 'pi pi-home',
       to: '/'
-    },
-    {
-      name: 'portfolio',
-      label: 'Portfolio',
-      icon: 'pi pi-chart-pie',
-      to: '/portfolio'
-    },
-    {
-      name: 'capital-activity',
-      label: 'Capital Activity',
-      icon: 'pi pi-credit-card',
-      to: '/capital-activity'
-    },
-    {
-      name: 'documents',
-      label: 'Documents',
-      icon: 'pi pi-file-pdf',
-      to: '/documents'
-    },
-    {
-      name: 'communications',
-      label: 'Communications',
-      icon: 'pi pi-bell',
-      to: '/communications'
     }
   ]
 
-  // Add admin link if user has SUPER_ADMIN role
-  const userRoles = authStore.user?.roles || []
-  if (userRoles.includes('SUPER_ADMIN')) {
-    baseItems.push({
-      name: 'admin',
-      label: 'Administration',
-      icon: 'pi pi-cog',
-      to: '/admin'
-    })
-  }
-
-  // Add plugin menus (type='main' menus only)
+  // Add plugin menus (type='main' menus only) BEFORE administration
   const pluginMenus = pluginRegistryStore.mainMenuItems
   pluginMenus.forEach(menu => {
     baseItems.push({
@@ -86,6 +51,17 @@ const navigationItems = computed(() => {
       to: menu.route
     })
   })
+
+  // Add admin link LAST if user has SUPER_ADMIN role
+  const userRoles = authStore.user?.roles || []
+  if (userRoles.includes('SUPER_ADMIN')) {
+    baseItems.push({
+      name: 'admin',
+      label: 'Administration',
+      icon: 'pi pi-cog',
+      to: '/admin'
+    })
+  }
 
   return baseItems
 })
