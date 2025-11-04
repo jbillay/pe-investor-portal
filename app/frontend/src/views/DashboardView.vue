@@ -176,11 +176,6 @@
       </div>
     </div>
 
-    <!-- Data Objects Widget -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <DataObjectWidget />
-    </div>
-
     <!-- Plugin Widgets: Dashboard Bottom -->
     <div v-if="dashboardBottomWidgets.length > 0" class="space-y-4">
       <div
@@ -199,10 +194,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { usePluginRegistryStore } from '@/stores/pluginRegistry';
-import { DataObjectWidget } from '@/components/dynamic/DataObjectWidget.vue';
 
 const authStore = useAuthStore();
 const pluginRegistryStore = usePluginRegistryStore();
