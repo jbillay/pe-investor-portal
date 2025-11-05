@@ -1,6 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from './prisma.service';
 
+// Mock the PrismaClient at the module level
+jest.mock('../../../generated/prisma/index', () => {
+  return {
+    PrismaClient: jest.fn().mockImplementation(function(this: any, options?: any) {
+      this.$connect = jest.fn().mockResolvedValue(undefined);
+      this.$disconnect = jest.fn().mockResolvedValue(undefined);
+      this.$transaction = jest.fn();
+      this.$executeRaw = jest.fn();
+      this.$queryRaw = jest.fn();
+      return this;
+    }),
+  };
+});
+
 describe('PrismaService', () => {
   let service: PrismaService;
 
@@ -14,9 +28,11 @@ describe('PrismaService', () => {
 
   afterEach(async () => {
     // Clean up any connections
-    await service.$disconnect().catch(() => {
-      // Ignore disconnect errors in tests
-    });
+    if (service && service.$disconnect) {
+      await service.$disconnect().catch(() => {
+        // Ignore disconnect errors in tests
+      });
+    }
   });
 
   describe('onModuleInit', () => {
@@ -62,6 +78,12 @@ describe('PrismaService', () => {
       expect(service).toHaveProperty('$connect');
       expect(service).toHaveProperty('$disconnect');
       expect(service).toHaveProperty('$transaction');
+    });
+  });
+
+  describe('service creation', () => {
+    it('should be defined', () => {
+      expect(service).toBeDefined();
     });
   });
 });
