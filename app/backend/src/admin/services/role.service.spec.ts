@@ -460,4 +460,492 @@ describe('RoleService', () => {
       );
     });
   });
+
+  describe('revokeRole', () => {
+    const revokeRoleDto = {
+      userId: 'user-1',
+      roleId: 'role-1',
+      reason: 'User changed departments',
+    };
+    const context = {
+      assignedBy: 'admin-1',
+      userAgent: 'Mozilla/5.0',
+      ipAddress: '127.0.0.1',
+    };
+
+    it('should revoke role from user successfully', async () => {
+      // Arrange
+      const mockUserRole = {
+        id: 'user-role-1',
+        userId: 'user-1',
+        roleId: 'role-1',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: createMockRole({ name: 'MANAGER' }),
+      };
+      prisma.userRole.findUnique.mockResolvedValue(mockUserRole);
+
+      const mockTransaction = jest.fn(async (callback) => {
+        return callback(prisma);
+      });
+      prisma.$transaction.mockImplementation(mockTransaction as any);
+
+      const mockAssignment = {
+        id: 'assignment-1',
+        userId: 'user-1',
+        roleId: 'role-1',
+        isActive: true,
+        revokedAt: null,
+      };
+      prisma.roleAssignment.findFirst.mockResolvedValue(mockAssignment as any);
+
+      // Act
+      await service.revokeRole(revokeRoleDto, context);
+
+      // Assert
+      expect(prisma.userRole.findUnique).toHaveBeenCalledWith({
+        where: {
+          userId_roleId: {
+            userId: revokeRoleDto.userId,
+            roleId: revokeRoleDto.roleId,
+          },
+        },
+        include: { role: true },
+      });
+      expect(prisma.$transaction).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when user does not have role', async () => {
+      // Arrange
+      prisma.userRole.findUnique.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.revokeRole(revokeRoleDto, context)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.revokeRole(revokeRoleDto, context)).rejects.toThrow(
+        'User does not have this role',
+      );
+    });
+
+    it('should throw NotFoundException when user role is inactive', async () => {
+      // Arrange
+      const inactiveUserRole = {
+        id: 'user-role-1',
+        userId: 'user-1',
+        roleId: 'role-1',
+        isActive: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: createMockRole(),
+      };
+      prisma.userRole.findUnique.mockResolvedValue(inactiveUserRole);
+
+      // Act & Assert
+      await expect(service.revokeRole(revokeRoleDto, context)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('bulkAssignRoles', () => {
+    const bulkAssignDto = {
+      userIds: ['user-1', 'user-2', 'user-3'],
+      roleId: 'role-1',
+      reason: 'Quarterly role updates',
+      expiresAt: null,
+    };
+    const context = {
+      assignedBy: 'admin-1',
+      userAgent: 'Mozilla/5.0',
+      ipAddress: '127.0.0.1',
+    };
+
+    it('should successfully assign role to all users', async () => {
+      // Arrange
+      const mockRole = createMockRole({ isActive: true });
+      prisma.role.findUnique.mockResolvedValue(mockRole);
+
+      // Mock successful assignments
+      const mockUser = createMockUser();
+      prisma.user.findUnique.mockResolvedValue(mockUser);
+      prisma.userRole.findUnique.mockResolvedValue(null);
+
+      const mockTransaction = jest.fn(async (callback) => {
+        return callback(prisma);
+      });
+      prisma.$transaction.mockImplementation(mockTransaction as any);
+
+      // Act
+      const result = await service.bulkAssignRoles(bulkAssignDto, context);
+
+      // Assert
+      expect(result.successCount).toBe(3);
+      expect(result.failures).toHaveLength(0);
+      expect(prisma.role.findUnique).toHaveBeenCalledWith({
+        where: { id: bulkAssignDto.roleId },
+      });
+    });
+
+    it('should throw NotFoundException when role not found', async () => {
+      // Arrange
+      prisma.role.findUnique.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.bulkAssignRoles(bulkAssignDto, context)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.bulkAssignRoles(bulkAssignDto, context)).rejects.toThrow(
+        `Active role with ID "${bulkAssignDto.roleId}" not found`,
+      );
+    });
+
+    it('should throw NotFoundException when role is inactive', async () => {
+      // Arrange
+      const inactiveRole = createMockRole({ isActive: false });
+      prisma.role.findUnique.mockResolvedValue(inactiveRole);
+
+      // Act & Assert
+      await expect(service.bulkAssignRoles(bulkAssignDto, context)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should handle partial failures gracefully', async () => {
+      // Arrange
+      const mockRole = createMockRole({ isActive: true });
+      prisma.role.findUnique.mockResolvedValue(mockRole);
+
+      const mockUser = createMockUser();
+      prisma.user.findUnique
+        .mockResolvedValueOnce(mockUser) // First user succeeds
+        .mockResolvedValueOnce(null) // Second user not found
+        .mockResolvedValueOnce(mockUser); // Third user succeeds
+
+      prisma.userRole.findUnique.mockResolvedValue(null);
+
+      const mockTransaction = jest.fn(async (callback) => {
+        return callback(prisma);
+      });
+      prisma.$transaction.mockImplementation(mockTransaction as any);
+
+      // Act
+      const result = await service.bulkAssignRoles(bulkAssignDto, context);
+
+      // Assert
+      expect(result.successCount).toBe(2);
+      expect(result.failures).toHaveLength(1);
+      expect(result.failures[0].userId).toBe('user-2');
+    });
+  });
+
+  describe('getUserRoles', () => {
+    it('should return user with active roles and permissions', async () => {
+      // Arrange
+      const mockUser = {
+        ...createMockUser(),
+        userRoles: [
+          {
+            id: 'user-role-1',
+            userId: 'user-1',
+            roleId: 'role-1',
+            isActive: true,
+            role: {
+              ...createMockRole({ name: 'ADMIN' }),
+              rolePermissions: [
+                {
+                  id: 'rp-1',
+                  roleId: 'role-1',
+                  permissionId: 'perm-1',
+                  isActive: true,
+                  permission: {
+                    id: 'perm-1',
+                    name: 'USER:READ',
+                    description: 'Read users',
+                    isActive: true,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  },
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                },
+              ],
+            },
+          },
+        ],
+      };
+      prisma.user.findUnique.mockResolvedValue(mockUser as any);
+
+      // Act
+      const result = await service.getUserRoles('user-1');
+
+      // Assert
+      expect(result.id).toBe(mockUser.id);
+      expect(result.email).toBe(mockUser.email);
+      expect(result.roles).toHaveLength(1);
+      expect(result.roles[0].name).toBe('ADMIN');
+      expect(result.permissions).toContain('USER:READ');
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        include: expect.any(Object),
+      });
+    });
+
+    it('should throw NotFoundException when user not found', async () => {
+      // Arrange
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.getUserRoles('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.getUserRoles('non-existent')).rejects.toThrow(
+        'User with ID "non-existent" not found',
+      );
+    });
+  });
+
+  describe('getRoleAssignmentHistory', () => {
+    it('should return role assignment history for user', async () => {
+      // Arrange
+      const mockAssignments = [
+        {
+          id: 'assignment-1',
+          userId: 'user-1',
+          roleId: 'role-1',
+          role: createMockRole({ name: 'ADMIN' }),
+          assignedBy: 'admin-1',
+          reason: 'Promoted',
+          expiresAt: null,
+          revokedAt: null,
+          revokedBy: null,
+          revokeReason: null,
+          isActive: true,
+          createdAt: new Date('2024-01-01'),
+          updatedAt: new Date('2024-01-01'),
+        },
+        {
+          id: 'assignment-2',
+          userId: 'user-1',
+          roleId: 'role-2',
+          role: createMockRole({ name: 'USER' }),
+          assignedBy: 'admin-1',
+          reason: 'Initial role',
+          expiresAt: null,
+          revokedAt: new Date('2024-01-15'),
+          revokedBy: 'admin-1',
+          revokeReason: 'Changed role',
+          isActive: false,
+          createdAt: new Date('2024-01-01'),
+          updatedAt: new Date('2024-01-15'),
+        },
+      ];
+      prisma.roleAssignment.findMany.mockResolvedValue(mockAssignments as any);
+
+      // Act
+      const result = await service.getRoleAssignmentHistory('user-1');
+
+      // Assert
+      expect(result).toHaveLength(2);
+      expect(result[0].role.name).toBe('ADMIN');
+      expect(result[0].isActive).toBe(true);
+      expect(result[1].isActive).toBe(false);
+      expect(result[1].revokedBy).toBe('admin-1');
+      expect(prisma.roleAssignment.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        include: { role: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    });
+  });
+
+  describe('getDefaultRole', () => {
+    it('should return default role when one exists', async () => {
+      // Arrange
+      const mockRole = {
+        ...createMockRoleWithPermissions({ isDefault: true, isActive: true }),
+        _count: { userRoles: 5 },
+      };
+      prisma.role.findFirst.mockResolvedValue(mockRole as any);
+
+      // Act
+      const result = await service.getDefaultRole();
+
+      // Assert
+      expect(result).not.toBeNull();
+      expect(result?.isDefault).toBe(true);
+      expect(result?.userCount).toBe(5);
+      expect(prisma.role.findFirst).toHaveBeenCalledWith({
+        where: { isDefault: true, isActive: true },
+        include: expect.any(Object),
+      });
+    });
+
+    it('should return null when no default role exists', async () => {
+      // Arrange
+      prisma.role.findFirst.mockResolvedValue(null);
+
+      // Act
+      const result = await service.getDefaultRole();
+
+      // Assert
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('userHasRole', () => {
+    it('should return true when user has the role', async () => {
+      // Arrange
+      const mockUserRole = {
+        id: 'user-role-1',
+        userId: 'user-1',
+        roleId: 'role-1',
+        isActive: true,
+      };
+      prisma.userRole.findFirst.mockResolvedValue(mockUserRole as any);
+
+      // Act
+      const result = await service.userHasRole('user-1', 'ADMIN');
+
+      // Assert
+      expect(result).toBe(true);
+      expect(prisma.userRole.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          isActive: true,
+          role: {
+            name: 'ADMIN',
+            isActive: true,
+          },
+        },
+      });
+    });
+
+    it('should return false when user does not have the role', async () => {
+      // Arrange
+      prisma.userRole.findFirst.mockResolvedValue(null);
+
+      // Act
+      const result = await service.userHasRole('user-1', 'ADMIN');
+
+      // Assert
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('userHasAnyRole', () => {
+    it('should return true when user has any of the specified roles', async () => {
+      // Arrange
+      const mockUserRole = {
+        id: 'user-role-1',
+        userId: 'user-1',
+        roleId: 'role-1',
+        isActive: true,
+      };
+      prisma.userRole.findFirst.mockResolvedValue(mockUserRole as any);
+
+      // Act
+      const result = await service.userHasAnyRole('user-1', ['ADMIN', 'MANAGER']);
+
+      // Assert
+      expect(result).toBe(true);
+      expect(prisma.userRole.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          isActive: true,
+          role: {
+            name: { in: ['ADMIN', 'MANAGER'] },
+            isActive: true,
+          },
+        },
+      });
+    });
+
+    it('should return false when user does not have any of the specified roles', async () => {
+      // Arrange
+      prisma.userRole.findFirst.mockResolvedValue(null);
+
+      // Act
+      const result = await service.userHasAnyRole('user-1', ['ADMIN', 'MANAGER']);
+
+      // Assert
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('getUsersWithRole', () => {
+    it('should return all users with the specified role', async () => {
+      // Arrange
+      const mockUserRoles = [
+        {
+          id: 'user-role-1',
+          userId: 'user-1',
+          roleId: 'role-1',
+          isActive: true,
+          user: {
+            ...createMockUser({ id: 'user-1', email: 'user1@example.com' }),
+            userRoles: [
+              {
+                id: 'user-role-1',
+                userId: 'user-1',
+                roleId: 'role-1',
+                isActive: true,
+                role: {
+                  ...createMockRole({ name: 'ADMIN' }),
+                  rolePermissions: [
+                    {
+                      id: 'rp-1',
+                      roleId: 'role-1',
+                      permissionId: 'perm-1',
+                      isActive: true,
+                      permission: {
+                        id: 'perm-1',
+                        name: 'USER:READ',
+                        description: 'Read users',
+                        isActive: true,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                      },
+                      createdAt: new Date(),
+                      updatedAt: new Date(),
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ];
+      prisma.userRole.findMany.mockResolvedValue(mockUserRoles as any);
+
+      // Act
+      const result = await service.getUsersWithRole('role-1');
+
+      // Assert
+      expect(result).toHaveLength(1);
+      expect(result[0].email).toBe('user1@example.com');
+      expect(result[0].roles).toHaveLength(1);
+      expect(result[0].roles[0].name).toBe('ADMIN');
+      expect(result[0].permissions).toContain('USER:READ');
+      expect(prisma.userRole.findMany).toHaveBeenCalledWith({
+        where: {
+          roleId: 'role-1',
+          isActive: true,
+        },
+        include: expect.any(Object),
+      });
+    });
+
+    it('should return empty array when no users have the role', async () => {
+      // Arrange
+      prisma.userRole.findMany.mockResolvedValue([]);
+
+      // Act
+      const result = await service.getUsersWithRole('role-1');
+
+      // Assert
+      expect(result).toHaveLength(0);
+    });
+  });
 });
