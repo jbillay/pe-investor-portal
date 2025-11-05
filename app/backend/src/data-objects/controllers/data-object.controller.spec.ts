@@ -308,4 +308,82 @@ describe('DataObjectController', () => {
       expect(versioningService.compareVersions).toHaveBeenCalledWith('obj-123', 3, 7);
     });
   });
+
+  describe('error handling', () => {
+    it('should handle errors in create', async () => {
+      const createDto = { dataKey: 'test', name: 'Test' };
+      dataObjectService.create.mockRejectedValue(new Error('Creation failed'));
+
+      await expect(controller.create(createDto as any, mockRequest)).rejects.toThrow(
+        'Creation failed',
+      );
+    });
+
+    it('should handle errors in findOne', async () => {
+      dataObjectService.findOne.mockRejectedValue(new Error('Not found'));
+
+      await expect(controller.findOne('invalid-id')).rejects.toThrow('Not found');
+    });
+
+    it('should handle errors in update', async () => {
+      const updateDto = { name: 'Updated' };
+      dataObjectService.update.mockRejectedValue(new Error('Update failed'));
+
+      await expect(controller.update('obj-123', updateDto as any, mockRequest)).rejects.toThrow(
+        'Update failed',
+      );
+    });
+
+    it('should handle errors in remove', async () => {
+      dataObjectService.remove.mockRejectedValue(new Error('Cannot delete with instances'));
+
+      await expect(controller.remove('obj-123')).rejects.toThrow('Cannot delete with instances');
+    });
+
+    it('should handle errors in addField', async () => {
+      const fieldDto = { fieldKey: 'test', label: 'Test', dataType: 'TEXT' };
+      fieldService.addField.mockRejectedValue(new Error('Field already exists'));
+
+      await expect(controller.addField('obj-123', fieldDto as any, mockRequest)).rejects.toThrow(
+        'Field already exists',
+      );
+    });
+
+    it('should handle errors in updateField', async () => {
+      const updateDto = { label: 'Updated' };
+      fieldService.updateField.mockRejectedValue(new Error('Field not found'));
+
+      await expect(
+        controller.updateField('obj-123', 'field-123', updateDto as any, mockRequest),
+      ).rejects.toThrow('Field not found');
+    });
+
+    it('should handle errors in deleteField', async () => {
+      fieldService.deleteField.mockRejectedValue(new Error('Cannot delete required field'));
+
+      await expect(controller.deleteField('obj-123', 'field-123', mockRequest)).rejects.toThrow(
+        'Cannot delete required field',
+      );
+    });
+
+    it('should handle errors in getVersionHistory', async () => {
+      versioningService.getVersionHistory.mockRejectedValue(new Error('History not found'));
+
+      await expect(controller.getVersionHistory('obj-123')).rejects.toThrow('History not found');
+    });
+
+    it('should handle errors in getVersion', async () => {
+      versioningService.getVersion.mockRejectedValue(new Error('Version not found'));
+
+      await expect(controller.getVersion('obj-123', '1')).rejects.toThrow('Version not found');
+    });
+
+    it('should handle errors in compareVersions', async () => {
+      versioningService.compareVersions.mockRejectedValue(new Error('Compare failed'));
+
+      await expect(controller.compareVersions('obj-123', '1', '2')).rejects.toThrow(
+        'Compare failed',
+      );
+    });
+  });
 });
