@@ -17,6 +17,7 @@ describe('EmailController', () => {
     const mockEmailService = {
       sendEmail: jest.fn(),
       sendTemplatedEmail: jest.fn(),
+      queueEmail: jest.fn(),
       getEmailLogs: jest.fn(),
       getEmailLog: jest.fn(),
       retryFailedEmail: jest.fn(),
@@ -24,13 +25,11 @@ describe('EmailController', () => {
     };
 
     const mockQueueService = {
-      queueEmail: jest.fn(),
-      getQueueStats: jest.fn(),
-      retryQueuedEmail: jest.fn(),
+      retryFailed: jest.fn(),
     };
 
     const mockQueueWorker = {
-      processQueue: jest.fn(),
+      getQueueStats: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -120,12 +119,12 @@ describe('EmailController', () => {
         scheduledFor: dto.scheduledFor,
       };
 
-      queueService.queueEmail.mockResolvedValue(mockResponse as any);
+      emailService.queueEmail.mockResolvedValue(mockResponse as any);
 
       const result = await controller.queueEmail(dto);
 
       expect(result).toEqual(mockResponse);
-      expect(queueService.queueEmail).toHaveBeenCalledWith(dto);
+      expect(emailService.queueEmail).toHaveBeenCalledWith(dto);
     });
   });
 
@@ -182,7 +181,7 @@ describe('EmailController', () => {
     });
   });
 
-  describe('retryFailedEmail', () => {
+  describe('retryEmail', () => {
     it('should retry sending failed email', async () => {
       const logId = 'log-failed-123';
 
@@ -194,16 +193,17 @@ describe('EmailController', () => {
 
       emailService.retryFailedEmail.mockResolvedValue(mockResponse as any);
 
-      const result = await controller.retryFailedEmail(logId);
+      const result = await controller.retryEmail(logId);
 
       expect(result).toEqual(mockResponse);
       expect(emailService.retryFailedEmail).toHaveBeenCalledWith(logId);
     });
   });
 
-  describe('getEmailStats', () => {
+  describe('getStats', () => {
     it('should return email statistics', async () => {
-      const query = { days: 30 };
+      const dateFrom = '2024-01-01';
+      const dateTo = '2024-01-31';
 
       const mockStats = {
         totalSent: 100,
@@ -215,10 +215,10 @@ describe('EmailController', () => {
 
       emailService.getEmailStats.mockResolvedValue(mockStats as any);
 
-      const result = await controller.getEmailStats(query);
+      const result = await controller.getStats(dateFrom, dateTo);
 
       expect(result).toEqual(mockStats);
-      expect(emailService.getEmailStats).toHaveBeenCalledWith(query);
+      expect(emailService.getEmailStats).toHaveBeenCalledWith(dateFrom, dateTo);
     });
   });
 
@@ -231,31 +231,28 @@ describe('EmailController', () => {
         completed: 100,
       };
 
-      queueService.getQueueStats.mockResolvedValue(mockStats as any);
+      queueWorker.getQueueStats.mockResolvedValue(mockStats as any);
 
       const result = await controller.getQueueStats();
 
       expect(result).toEqual(mockStats);
-      expect(queueService.getQueueStats).toHaveBeenCalled();
+      expect(queueWorker.getQueueStats).toHaveBeenCalled();
     });
   });
 
-  describe('retryQueuedEmail', () => {
+  describe('retryQueueItem', () => {
     it('should retry queued email', async () => {
       const queueId = 'queue-123';
 
-      const mockResponse = {
+      queueService.retryFailed.mockResolvedValue(undefined);
+
+      const result = await controller.retryQueueItem(queueId);
+
+      expect(result).toEqual({
         success: true,
-        queueId,
-        status: 'processing',
-      };
-
-      queueService.retryQueuedEmail.mockResolvedValue(mockResponse as any);
-
-      const result = await controller.retryQueuedEmail(queueId);
-
-      expect(result).toEqual(mockResponse);
-      expect(queueService.retryQueuedEmail).toHaveBeenCalledWith(queueId);
+        message: 'Queue item reset for retry',
+      });
+      expect(queueService.retryFailed).toHaveBeenCalledWith(queueId);
     });
   });
 });
