@@ -23,6 +23,9 @@ describe('JwtAuthGuard', () => {
 
     guard = module.get<JwtAuthGuard>(JwtAuthGuard);
     reflector = module.get(Reflector) as jest.Mocked<Reflector>;
+
+    // Mock the parent class's canActivate to avoid Passport dependency
+    jest.spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate').mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -66,19 +69,18 @@ describe('JwtAuthGuard', () => {
       // Arrange
       const context = createMockExecutionContext();
       reflector.getAllAndOverride.mockReturnValue(false);
+      const parentCanActivate = jest.spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate');
 
-      // Mock the super.canActivate to return a resolved promise
-      jest.spyOn(guard as any, 'getAuthenticateOptions').mockReturnValue({});
+      // Act
+      const result = guard.canActivate(context);
 
-      // Act & Assert
-      // Note: super.canActivate will call passport strategy, which we can't easily test
-      // but we can verify the public check works correctly
-      expect(reflector.getAllAndOverride).toHaveBeenCalledTimes(0);
-      guard.canActivate(context);
+      // Assert
+      expect(result).toBe(true); // Returns true because we mocked parent canActivate
       expect(reflector.getAllAndOverride).toHaveBeenCalledWith(IS_PUBLIC_KEY, [
         context.getHandler(),
         context.getClass(),
       ]);
+      expect(parentCanActivate).toHaveBeenCalledWith(context);
     });
   });
 
