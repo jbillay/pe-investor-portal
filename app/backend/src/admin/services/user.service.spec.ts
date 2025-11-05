@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, ConflictException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserService } from './user.service';
@@ -19,6 +19,11 @@ describe('UserService', () => {
   let auditLogger: jest.Mocked<AuditLoggerService>;
   let emailService: jest.Mocked<EmailService>;
 
+  // Mock transaction helper
+  const mockTransactionCallback = (callback: any) => {
+    return callback(mockPrisma);
+  };
+
   const mockPrisma = {
     user: {
       findUnique: jest.fn(),
@@ -28,9 +33,21 @@ describe('UserService', () => {
       count: jest.fn(),
     },
     userProfile: { create: jest.fn() },
-    userRole: { createMany: jest.fn(), findMany: jest.fn(), deleteMany: jest.fn() },
+    userRole: {
+      createMany: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      deleteMany: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+      count: jest.fn(),
+    },
     role: { findMany: jest.fn() },
-    $transaction: jest.fn((callback) => callback(mockPrisma)),
+    roleAssignment: {
+      create: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    $transaction: jest.fn(mockTransactionCallback),
   };
 
   const mockConfigService = {
@@ -49,6 +66,7 @@ describe('UserService', () => {
 
   const mockAuditLogger = {
     logEvent: jest.fn(),
+    logUserEvent: jest.fn(),
   };
 
   const mockEmailService = {
@@ -73,6 +91,11 @@ describe('UserService', () => {
     eventEmitter = module.get(EventEmitter2) as any;
     auditLogger = module.get(AuditLoggerService) as any;
     emailService = module.get(EmailService) as any;
+
+    // Suppress logger output
+    jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   });
 
   afterEach(() => {
@@ -93,20 +116,23 @@ describe('UserService', () => {
           userRoles: [{ role: { name: 'USER' } }],
         },
       ];
-      
+
       prisma.user.findMany.mockResolvedValue(mockUsers as any);
       prisma.user.count.mockResolvedValue(1);
+      auditLogger.logUserEvent.mockResolvedValue(undefined);
 
       const result = await service.findAll({ page: 1, limit: 20 }, 'admin-1');
 
-      expect(result.users).toHaveLength(1);
-      expect(result.total).toBe(1);
-      expect(result.page).toBe(1);
+      expect(result.data).toHaveLength(1);
+      expect(result.pagination.total).toBe(1);
+      expect(result.pagination.page).toBe(1);
+      expect(auditLogger.logUserEvent).toHaveBeenCalled();
     });
 
     it('should filter users by search term', async () => {
       prisma.user.findMany.mockResolvedValue([]);
       prisma.user.count.mockResolvedValue(0);
+      auditLogger.logUserEvent.mockResolvedValue(undefined);
 
       await service.findAll({ page: 1, limit: 20, search: 'john' }, 'admin-1');
 
@@ -117,6 +143,26 @@ describe('UserService', () => {
           }),
         })
       );
+    });
+
+    it('should filter by status', async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+      prisma.user.count.mockResolvedValue(0);
+      auditLogger.logUserEvent.mockResolvedValue(undefined);
+
+      await service.findAll({ page: 1, limit: 20, status: 'ACTIVE' as any }, 'admin-1');
+
+      expect(prisma.user.findMany).toHaveBeenCalled();
+    });
+
+    it('should filter by verification status', async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+      prisma.user.count.mockResolvedValue(0);
+      auditLogger.logUserEvent.mockResolvedValue(undefined);
+
+      await service.findAll({ page: 1, limit: 20, isVerified: true }, 'admin-1');
+
+      expect(prisma.user.findMany).toHaveBeenCalled();
     });
   });
 
@@ -174,13 +220,13 @@ describe('UserService', () => {
       password: 'SecurePass123!',
       firstName: 'Jane',
       lastName: 'Smith',
-      roleIds: ['role-1'],
+      roles: ['USER'],
     };
 
     it('should create new user successfully', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
-      
+
       const mockCreatedUser = {
         id: 'new-user-1',
         email: createUserDto.email,
@@ -188,21 +234,35 @@ describe('UserService', () => {
         lastName: createUserDto.lastName,
       };
 
-      prisma.$transaction.mockResolvedValue({
-        user: mockCreatedUser,
-        roles: [{ id: 'role-1', name: 'USER' }],
+      const mockRoles = [{ id: 'role-1', name: 'USER' }];
+      prisma.role.findMany.mockResolvedValue(mockRoles as any);
+      prisma.user.create.mockResolvedValue(mockCreatedUser as any);
+      prisma.userRole.createMany.mockResolvedValue({ count: 1 } as any);
+
+      prisma.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrisma);
       });
 
       const result = await service.create(createUserDto, 'admin-1');
 
       expect(result.user.email).toBe(createUserDto.email);
-      expect(auditLogger.logEvent).toHaveBeenCalled();
+      expect(auditLogger.logUserEvent).toHaveBeenCalled();
     });
 
     it('should throw ConflictException when email exists', async () => {
       prisma.user.findUnique.mockResolvedValue({ id: 'existing-user' } as any);
 
       await expect(service.create(createUserDto, 'admin-1')).rejects.toThrow(ConflictException);
+    });
+
+    it('should handle database errors during creation', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+      prisma.role.findMany.mockResolvedValue([{ id: 'role-1', name: 'USER' }] as any);
+
+      prisma.$transaction.mockRejectedValue(new Error('Database error'));
+
+      await expect(service.create(createUserDto, 'admin-1')).rejects.toThrow(InternalServerErrorException);
     });
   });
 
@@ -211,12 +271,14 @@ describe('UserService', () => {
       email: 'newuser@example.com',
       firstName: 'Jane',
       lastName: 'Smith',
-      roleIds: ['role-1'],
+      roles: ['USER'],
     };
 
     it('should create user with temporary password', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
-      (crypto.randomBytes as jest.Mock).mockReturnValue(Buffer.from('temppass123'));
+      (crypto.randomBytes as jest.Mock).mockReturnValue({
+        toString: jest.fn().mockReturnValue('temppass123')
+      });
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-temp-password');
 
       const mockCreatedUser = {
@@ -226,9 +288,13 @@ describe('UserService', () => {
         lastName: createDto.lastName,
       };
 
-      prisma.$transaction.mockResolvedValue({
-        user: mockCreatedUser,
-        roles: [{ id: 'role-1', name: 'USER' }],
+      const mockRoles = [{ id: 'role-1', name: 'USER' }];
+      prisma.role.findMany.mockResolvedValue(mockRoles as any);
+      prisma.user.create.mockResolvedValue(mockCreatedUser as any);
+      prisma.userRole.createMany.mockResolvedValue({ count: 1 } as any);
+
+      prisma.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrisma);
       });
 
       emailService.sendWelcomeEmail.mockResolvedValue(undefined);
@@ -238,6 +304,36 @@ describe('UserService', () => {
       expect(result.user.email).toBe(createDto.email);
       expect(result.temporaryPassword).toBeDefined();
       expect(emailService.sendWelcomeEmail).toHaveBeenCalled();
+    });
+
+    it('should handle email sending failures gracefully', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      (crypto.randomBytes as jest.Mock).mockReturnValue({
+        toString: jest.fn().mockReturnValue('temppass123')
+      });
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-temp-password');
+
+      const mockCreatedUser = {
+        id: 'new-user-1',
+        email: createDto.email,
+        firstName: createDto.firstName,
+        lastName: createDto.lastName,
+      };
+
+      prisma.role.findMany.mockResolvedValue([{ id: 'role-1', name: 'USER' }] as any);
+      prisma.user.create.mockResolvedValue(mockCreatedUser as any);
+      prisma.userRole.createMany.mockResolvedValue({ count: 1 } as any);
+
+      prisma.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrisma);
+      });
+
+      emailService.sendWelcomeEmail.mockRejectedValue(new Error('Email service error'));
+
+      const result = await service.createUserWithTempPassword(createDto, 'admin-1');
+
+      expect(result.user.email).toBe(createDto.email);
+      expect(result.temporaryPassword).toBeDefined();
     });
   });
 
@@ -253,17 +349,22 @@ describe('UserService', () => {
         email: 'test@example.com',
         firstName: 'John',
         lastName: 'Doe',
+        updatedAt: new Date(),
       };
 
       prisma.user.findUnique.mockResolvedValue(existingUser as any);
-      
+
       const updatedUser = { ...existingUser, ...updateDto };
-      prisma.$transaction.mockResolvedValue(updatedUser);
+      prisma.user.update.mockResolvedValue(updatedUser as any);
+
+      prisma.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrisma);
+      });
 
       const result = await service.update('user-1', updateDto, 'admin-1');
 
       expect(result.firstName).toBe('Updated');
-      expect(auditLogger.logEvent).toHaveBeenCalled();
+      expect(auditLogger.logUserEvent).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when user not found', async () => {
@@ -274,11 +375,26 @@ describe('UserService', () => {
 
     it('should throw ConflictException when updating to existing email', async () => {
       prisma.user.findUnique
-        .mockResolvedValueOnce({ id: 'user-1', email: 'original@example.com' } as any)
+        .mockResolvedValueOnce({ id: 'user-1', email: 'original@example.com', updatedAt: new Date() } as any)
         .mockResolvedValueOnce({ id: 'user-2', email: 'taken@example.com' } as any);
 
       await expect(
         service.update('user-1', { email: 'taken@example.com' }, 'admin-1')
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should detect concurrent updates', async () => {
+      const oldTimestamp = new Date('2024-01-01');
+      const newTimestamp = new Date('2024-01-02');
+
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        updatedAt: newTimestamp
+      } as any);
+
+      await expect(
+        service.update('user-1', { firstName: 'Test', updatedAt: oldTimestamp } as any, 'admin-1')
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -309,6 +425,14 @@ describe('UserService', () => {
         data: expect.objectContaining({ isActive: false }),
       });
     });
+
+    it('should throw NotFoundException when user not found', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateStatus('non-existent', { isActive: true }, 'admin-1')
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('updateVerification', () => {
@@ -324,94 +448,147 @@ describe('UserService', () => {
         data: expect.objectContaining({ isVerified: true }),
       });
     });
+
+    it('should unverify user', async () => {
+      const user = { id: 'user-1', isVerified: true };
+      prisma.user.findUnique.mockResolvedValue(user as any);
+      prisma.user.update.mockResolvedValue({ ...user, isVerified: false } as any);
+
+      await service.updateVerification('user-1', { isVerified: false }, 'admin-1');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: expect.objectContaining({ isVerified: false }),
+      });
+    });
   });
 
   describe('remove', () => {
     it('should soft delete user (deactivate)', async () => {
-      const user = { id: 'user-1', isActive: true };
-      prisma.user.findUnique.mockResolvedValue(user as any);
-      prisma.user.update.mockResolvedValue({ ...user, isActive: false } as any);
+      prisma.user.update.mockResolvedValue({ id: 'user-1', isActive: false } as any);
+      prisma.session.updateMany = jest.fn().mockResolvedValue({ count: 0 });
+      prisma.userRole.updateMany.mockResolvedValue({ count: 0 } as any);
+
+      prisma.$transaction.mockImplementation(async (callback) => {
+        return await callback({
+          ...mockPrisma,
+          session: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        });
+      });
 
       const result = await service.remove('user-1', 'admin-1');
 
       expect(result.message).toContain('deactivated');
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: 'user-1' },
-        data: expect.objectContaining({ isActive: false }),
-      });
+      expect(eventEmitter.emit).toHaveBeenCalledWith('user.deleted', expect.any(Object));
     });
 
-    it('should throw NotFoundException when user not found', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+    it('should throw BadRequestException when trying to delete own account', async () => {
+      await expect(service.remove('admin-1', 'admin-1')).rejects.toThrow(BadRequestException);
+    });
 
-      await expect(service.remove('non-existent', 'admin-1')).rejects.toThrow(NotFoundException);
+    it('should handle database errors during deletion', async () => {
+      prisma.$transaction.mockRejectedValue(new Error('Database error'));
+
+      await expect(service.remove('user-1', 'admin-1')).rejects.toThrow(InternalServerErrorException);
     });
   });
 
   describe('assignRoles', () => {
     const assignDto = {
-      roleIds: ['role-1', 'role-2'],
+      roles: ['ADMIN', 'MANAGER'],
       reason: 'Promotion',
     };
 
     it('should assign roles to user', async () => {
-      const user = { id: 'user-1' };
       const roles = [
         { id: 'role-1', name: 'ADMIN', isActive: true },
         { id: 'role-2', name: 'MANAGER', isActive: true },
       ];
 
-      prisma.user.findUnique.mockResolvedValue(user as any);
       prisma.role.findMany.mockResolvedValue(roles as any);
-      prisma.$transaction.mockResolvedValue(undefined);
+      prisma.userRole.findFirst.mockResolvedValue(null);
+      prisma.userRole.upsert.mockResolvedValue({} as any);
+      prisma.roleAssignment.create.mockResolvedValue({} as any);
 
-      await service.assignRoles('user-1', assignDto, 'admin-1');
+      prisma.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrisma);
+      });
 
-      expect(prisma.$transaction).toHaveBeenCalled();
-      expect(auditLogger.logEvent).toHaveBeenCalled();
-    });
+      const result = await service.assignRoles('user-1', assignDto, 'admin-1');
 
-    it('should throw NotFoundException when user not found', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-
-      await expect(service.assignRoles('non-existent', assignDto, 'admin-1')).rejects.toThrow(NotFoundException);
+      expect(result.message).toContain('assigned successfully');
+      expect(auditLogger.logUserEvent).toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith('user.roles.assigned', expect.any(Object));
     });
 
     it('should throw BadRequestException when roles not found', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1' } as any);
-      prisma.role.findMany.mockResolvedValue([]);
+      prisma.role.findMany.mockResolvedValue([{ id: 'role-1', name: 'ADMIN' }] as any);
 
       await expect(service.assignRoles('user-1', assignDto, 'admin-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should skip already assigned roles', async () => {
+      const roles = [
+        { id: 'role-1', name: 'ADMIN', isActive: true },
+        { id: 'role-2', name: 'MANAGER', isActive: true },
+      ];
+
+      prisma.role.findMany.mockResolvedValue(roles as any);
+      prisma.userRole.findFirst.mockResolvedValue({ id: 'existing', isActive: true } as any);
+
+      prisma.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrisma);
+      });
+
+      await service.assignRoles('user-1', assignDto, 'admin-1');
+
+      expect(prisma.userRole.upsert).not.toHaveBeenCalled();
+      expect(prisma.roleAssignment.create).not.toHaveBeenCalled();
     });
   });
 
   describe('revokeRoles', () => {
     const revokeDto = {
-      roleIds: ['role-1'],
+      roles: ['ADMIN'],
       reason: 'Role change',
     };
 
     it('should revoke roles from user', async () => {
-      const user = { id: 'user-1' };
-      const existingRoles = [
-        { userId: 'user-1', roleId: 'role-1', isActive: true, role: { name: 'ADMIN' } },
+      const userRoles = [
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', isActive: true, role: { name: 'ADMIN' } },
       ];
 
-      prisma.user.findUnique.mockResolvedValue(user as any);
-      prisma.userRole.findMany.mockResolvedValue(existingRoles as any);
-      prisma.$transaction.mockResolvedValue(undefined);
+      prisma.userRole.findMany.mockResolvedValue(userRoles as any);
+      prisma.userRole.count.mockResolvedValue(1); // At least one role remaining
+      prisma.userRole.update.mockResolvedValue({} as any);
+      prisma.roleAssignment.updateMany.mockResolvedValue({ count: 1 } as any);
 
-      await service.revokeRoles('user-1', revokeDto, 'admin-1');
+      prisma.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrisma);
+      });
 
-      expect(prisma.$transaction).toHaveBeenCalled();
-      expect(auditLogger.logEvent).toHaveBeenCalled();
+      const result = await service.revokeRoles('user-1', revokeDto, 'admin-1');
+
+      expect(result.message).toContain('revoked successfully');
+      expect(auditLogger.logUserEvent).toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith('user.roles.revoked', expect.any(Object));
     });
 
-    it('should throw NotFoundException when no active roles found', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1' } as any);
+    it('should throw BadRequestException when user does not have specified roles', async () => {
       prisma.userRole.findMany.mockResolvedValue([]);
 
-      await expect(service.revokeRoles('user-1', revokeDto, 'admin-1')).rejects.toThrow(NotFoundException);
+      await expect(service.revokeRoles('user-1', revokeDto, 'admin-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when trying to revoke all roles', async () => {
+      const userRoles = [
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', isActive: true, role: { name: 'ADMIN' } },
+      ];
+
+      prisma.userRole.findMany.mockResolvedValue(userRoles as any);
+      prisma.userRole.count.mockResolvedValue(0); // No roles remaining
+
+      await expect(service.revokeRoles('user-1', revokeDto, 'admin-1')).rejects.toThrow(BadRequestException);
     });
   });
 });
