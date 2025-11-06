@@ -293,4 +293,55 @@ describe('EmailTemplateController', () => {
       expect(templateService.getVariableSchema).toHaveBeenCalledWith('template-123');
     });
   });
+
+  describe('error handling', () => {
+    it('should handle service errors in create', async () => {
+      const createDto = { name: 'Test', subject: 'Test', htmlBody: 'Test' };
+      templateService.create.mockRejectedValue(new Error('Database error'));
+
+      await expect(controller.create(createDto as any, mockUser as any)).rejects.toThrow(
+        'Database error',
+      );
+    });
+
+    it('should handle service errors in findOne', async () => {
+      templateService.findOne.mockRejectedValue(new Error('Not found'));
+
+      await expect(controller.findOne('invalid-id')).rejects.toThrow('Not found');
+    });
+
+    it('should handle service errors in update', async () => {
+      const updateDto = { subject: 'Updated' };
+      templateService.update.mockRejectedValue(new Error('Update failed'));
+
+      await expect(
+        controller.update('template-123', updateDto as any, mockUser as any),
+      ).rejects.toThrow('Update failed');
+    });
+
+    it('should handle service errors in delete', async () => {
+      templateService.delete.mockRejectedValue(new Error('Cannot delete system template'));
+
+      await expect(controller.delete('template-123')).rejects.toThrow(
+        'Cannot delete system template',
+      );
+    });
+
+    it('should handle service errors in duplicate', async () => {
+      templateService.duplicate.mockRejectedValue(new Error('Template not found'));
+
+      await expect(controller.duplicate('invalid-id', mockUser as any)).rejects.toThrow(
+        'Template not found',
+      );
+    });
+
+    it('should handle service errors in preview', async () => {
+      const previewDto = { variables: {} };
+      templateService.preview.mockRejectedValue(new Error('Invalid variables'));
+
+      await expect(controller.preview('template-123', previewDto as any)).rejects.toThrow(
+        'Invalid variables',
+      );
+    });
+  });
 });

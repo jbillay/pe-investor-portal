@@ -290,4 +290,57 @@ describe('PluginController', () => {
       expect(pluginService.deletePlugin).toHaveBeenCalledWith('my-awesome-plugin');
     });
   });
+
+  describe('error handling', () => {
+    it('should handle upload errors', async () => {
+      const mockRequest = { user: mockUser };
+      pluginService.uploadPlugin.mockRejectedValue(new Error('Upload failed'));
+
+      await expect(controller.uploadPlugin(mockFile, mockRequest)).rejects.toThrow(
+        'Upload failed',
+      );
+    });
+
+    it('should handle getPlugin errors', async () => {
+      pluginService.getPlugin.mockRejectedValue(new Error('Plugin not found'));
+
+      await expect(controller.getPlugin('invalid-id')).rejects.toThrow('Plugin not found');
+    });
+
+    it('should handle getManifest errors', async () => {
+      pluginService.getManifest.mockRejectedValue(new Error('Manifest not found'));
+
+      await expect(controller.getManifest('invalid-id')).rejects.toThrow('Manifest not found');
+    });
+
+    it('should handle install errors', async () => {
+      const mockRequest = { user: mockUser };
+      pluginService.installPlugin.mockRejectedValue(new Error('Installation failed'));
+
+      await expect(controller.installPlugin('plugin-id', mockRequest)).rejects.toThrow(
+        'Installation failed',
+      );
+    });
+
+    it('should handle uninstall errors', async () => {
+      const mockRequest = { user: mockUser };
+      pluginService.uninstallPlugin.mockRejectedValue(new Error('Uninstall failed'));
+
+      await expect(controller.uninstallPlugin('plugin-id', mockRequest)).rejects.toThrow(
+        'Uninstall failed',
+      );
+    });
+
+    it('should handle delete errors', async () => {
+      pluginService.deletePlugin.mockRejectedValue(new Error('Delete failed'));
+
+      await expect(controller.deletePlugin('plugin-id')).rejects.toThrow('Delete failed');
+    });
+
+    it('should handle listPlugins errors', async () => {
+      pluginService.listPlugins.mockRejectedValue(new Error('List failed'));
+
+      await expect(controller.listPlugins({} as any)).rejects.toThrow('List failed');
+    });
+  });
 });
