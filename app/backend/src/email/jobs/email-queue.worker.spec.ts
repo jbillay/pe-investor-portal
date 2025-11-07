@@ -1,8 +1,3 @@
-// Mock Prisma before importing services
-jest.mock('../../generated/prisma', () => ({
-  PrismaClient: jest.fn(),
-}));
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { EmailQueueWorker } from './email-queue.worker';
 import { EmailService } from '../services/email.service';
