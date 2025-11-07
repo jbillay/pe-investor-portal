@@ -526,6 +526,162 @@ describe('Plugin Registry Store', () => {
     })
   })
 
+  describe('loadPluginModule', () => {
+    beforeEach(() => {
+      vi.mocked(pluginApiService.getInstalledPlugins).mockResolvedValue([mockPlugin])
+      vi.mocked(pluginApiService.getPluginFileUrl).mockReturnValue('/plugins/test-plugin/index.js')
+    })
+
+    it('should throw error if plugin not found', async () => {
+      const store = usePluginRegistryStore()
+      await store.fetchInstalledPlugins()
+
+      await expect(store.loadPluginModule('non-existent')).rejects.toThrow()
+    })
+
+    it('should throw error if plugin not installed', async () => {
+      const uploadedPlugin = { ...mockPlugin, status: 'UPLOADED' as PluginStatus }
+      vi.mocked(pluginApiService.getInstalledPlugins).mockResolvedValue([uploadedPlugin])
+
+      const store = usePluginRegistryStore()
+      await store.fetchInstalledPlugins()
+
+      await expect(store.loadPluginModule('test-plugin')).rejects.toThrow()
+    })
+
+    it('should return early if plugin already loaded', async () => {
+      const store = usePluginRegistryStore()
+      await store.fetchInstalledPlugins()
+
+      // Pre-load the plugin
+      store.loadedPlugins.set('test-plugin', {
+        manifest: mockManifest,
+        loadedAt: new Date(),
+      })
+
+      await store.loadPluginModule('test-plugin')
+
+      // Should not call getPluginFileUrl since plugin is already loaded
+      expect(pluginApiService.getPluginFileUrl).not.toHaveBeenCalled()
+    })
+
+    it('should store error in loaded plugins on import failure', async () => {
+      const store = usePluginRegistryStore()
+      await store.fetchInstalledPlugins()
+
+      // The dynamic import will fail because the file doesn't exist
+      await expect(store.loadPluginModule('test-plugin')).rejects.toThrow()
+
+      const loadedPlugin = store.getLoadedPlugin('test-plugin')
+      expect(loadedPlugin).toBeDefined()
+      expect(loadedPlugin?.error).toBeDefined()
+    })
+  })
+
+  describe('loadAllPlugins', () => {
+    it('should attempt to load all installed plugins', async () => {
+      const mockPlugin3 = {
+        ...mockPlugin,
+        id: '3',
+        pluginId: 'test-plugin-3',
+        status: 'INSTALLED' as PluginStatus,
+      }
+      vi.mocked(pluginApiService.getInstalledPlugins).mockResolvedValue([
+        mockPlugin,
+        mockPlugin2,
+        mockPlugin3,
+      ])
+      vi.mocked(pluginApiService.getPluginFileUrl).mockReturnValue('/plugins/mock/index.js')
+
+      const store = usePluginRegistryStore()
+      await store.fetchInstalledPlugins()
+
+      // loadAllPlugins will attempt to load plugins but will fail on dynamic import
+      // The important thing is it doesn't throw and continues
+      await expect(store.loadAllPlugins()).resolves.not.toThrow()
+    })
+
+    it('should continue loading other plugins if one fails', async () => {
+      const mockPlugin3 = {
+        ...mockPlugin,
+        id: '3',
+        pluginId: 'test-plugin-3',
+        status: 'INSTALLED' as PluginStatus,
+      }
+      vi.mocked(pluginApiService.getInstalledPlugins).mockResolvedValue([mockPlugin, mockPlugin3])
+      vi.mocked(pluginApiService.getPluginFileUrl).mockReturnValue('/plugins/mock/index.js')
+
+      const store = usePluginRegistryStore()
+      await store.fetchInstalledPlugins()
+
+      // loadAllPlugins should not throw even if individual plugins fail to load
+      await expect(store.loadAllPlugins()).resolves.not.toThrow()
+
+      // Both plugins should have error states in loaded plugins
+      expect(store.loadedPlugins.size).toBe(2)
+    })
+  })
+
+  describe('refreshPluginRegistry', () => {
+    it('should refresh plugins and reload modules', async () => {
+      vi.mocked(pluginApiService.getInstalledPlugins).mockResolvedValue([mockPlugin])
+      vi.mocked(pluginApiService.getPluginFileUrl).mockReturnValue('/plugins/mock/index.js')
+
+      const store = usePluginRegistryStore()
+
+      // refreshPluginRegistry should call fetchInstalledPlugins and loadAllPlugins
+      await expect(store.refreshPluginRegistry()).resolves.not.toThrow()
+
+      // After refresh, installedPlugins should be populated
+      expect(store.installedPlugins).toHaveLength(1)
+      expect(store.lastRefreshed).not.toBeNull()
+    })
+  })
+
+  describe('initialize', () => {
+    it('should initialize plugin system successfully', async () => {
+      vi.mocked(pluginApiService.getInstalledPlugins).mockResolvedValue([mockPlugin])
+      vi.mocked(pluginApiService.getPluginFileUrl).mockReturnValue('/plugins/mock/index.js')
+
+      const store = usePluginRegistryStore()
+
+      await expect(store.initialize()).resolves.not.toThrow()
+
+      expect(store.installedPlugins).toEqual([mockPlugin])
+      expect(store.error).toBeNull()
+      expect(store.isLoading).toBe(false)
+      expect(store.lastRefreshed).not.toBeNull()
+    })
+
+    it('should handle initialization error', async () => {
+      const error = new Error('Initialization failed')
+      vi.mocked(pluginApiService.getInstalledPlugins).mockRejectedValue(error)
+
+      const store = usePluginRegistryStore()
+
+      await expect(store.initialize()).rejects.toThrow('Initialization failed')
+      expect(store.error).toBe('Initialization failed')
+      expect(store.isLoading).toBe(false)
+    })
+
+    it('should set loading state during initialization', async () => {
+      vi.mocked(pluginApiService.getInstalledPlugins).mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve([mockPlugin]), 100))
+      )
+      vi.mocked(pluginApiService.getPluginFileUrl).mockReturnValue('/plugins/mock/index.js')
+
+      const store = usePluginRegistryStore()
+
+      const initPromise = store.initialize()
+
+      expect(store.isLoading).toBe(true)
+
+      await initPromise
+
+      expect(store.isLoading).toBe(false)
+    })
+  })
+
   describe('Edge Cases', () => {
     it('should handle empty plugin list', async () => {
       vi.mocked(pluginApiService.getInstalledPlugins).mockResolvedValue([])
