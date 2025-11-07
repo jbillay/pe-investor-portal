@@ -1,0 +1,166 @@
+name: CI - Tests and Coverage
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: |
+            app/backend/package-lock.json
+            app/frontend/package-lock.json
+
+      # Backend Tests
+      - name: Install backend dependencies
+        working-directory: app/backend
+        run: npm install --legacy-peer-deps
+
+      - name: Build backend
+        working-directory: app/backend
+        run: npm run build
+
+      - name: Run backend tests with coverage
+        working-directory: app/backend
+        run: npm run test:cov
+
+      - name: Extract backend coverage
+        id: backend-coverage
+        working-directory: app/backend
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            COVERAGE=$(node -p "
+              const fs = require('fs');
+              const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              Math.round(coverage.total.lines.pct);
+            ")
+            echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
+            echo "Backend coverage: $COVERAGE%"
+          else
+            echo "percentage=0" >> $GITHUB_OUTPUT
+            echo "No coverage file found"
+          fi
+
+      # Frontend Tests
+      - name: Install frontend dependencies
+        working-directory: app/frontend
+        run: npm install --legacy-peer-deps
+
+      - name: Build frontend
+        working-directory: app/frontend
+        run: npm run build-only
+
+      - name: Run frontend tests with coverage
+        working-directory: app/frontend
+        run: npm run test:unit -- --coverage --run
+
+      - name: Extract frontend coverage
+        id: frontend-coverage
+        working-directory: app/frontend
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            COVERAGE=$(node -p "
+              const fs = require('fs');
+              const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              Math.round(coverage.total.lines.pct);
+            ")
+            echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
+            echo "Frontend coverage: $COVERAGE%"
+          else
+            echo "percentage=0" >> $GITHUB_OUTPUT
+            echo "No coverage file found"
+          fi
+
+      # Generate badges
+      - name: Create badges directory
+        run: mkdir -p .github/badges
+
+      - name: Generate backend coverage badge
+        run: |
+          COVERAGE=${{ steps.backend-coverage.outputs.percentage }}
+          COLOR="red"
+          if [ "$COVERAGE" -ge 80 ]; then COLOR="brightgreen"
+          elif [ "$COVERAGE" -ge 60 ]; then COLOR="yellow"
+          elif [ "$COVERAGE" -ge 40 ]; then COLOR="orange"
+          fi
+
+          curl -s "https://img.shields.io/badge/Backend_Coverage-${COVERAGE}%25-${COLOR}?style=flat-square&logo=jest" \
+            -o .github/badges/backend-coverage.svg
+
+      - name: Generate frontend coverage badge
+        run: |
+          COVERAGE=${{ steps.frontend-coverage.outputs.percentage }}
+          COLOR="red"
+          if [ "$COVERAGE" -ge 80 ]; then COLOR="brightgreen"
+          elif [ "$COVERAGE" -ge 60 ]; then COLOR="yellow"
+          elif [ "$COVERAGE" -ge 40 ]; then COLOR="orange"
+          fi
+
+          curl -s "https://img.shields.io/badge/Frontend_Coverage-${COVERAGE}%25-${COLOR}?style=flat-square&logo=vitest" \
+            -o .github/badges/frontend-coverage.svg
+
+      - name: Generate CI badge
+        run: |
+          curl -s "https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square&logo=github" \
+            -o .github/badges/ci-status.svg
+
+      # Commit badges to main branch
+      - name: Commit badges
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .github/badges/*.svg
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update coverage badges [skip ci]" && git push)
+
+      # Upload coverage reports as artifacts
+      - name: Upload backend coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: app/backend/coverage/
+          retention-days: 30
+
+      - name: Upload frontend coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: app/frontend/coverage/
+          retention-days: 30
+
+      - name: Upload badges
+        uses: actions/upload-artifact@v4
+        with:
+          name: badges
+          path: .github/badges/
+          retention-days: 30
+
+      # Summary
+      - name: Create test summary
+        run: |
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend**: ${{ steps.backend-coverage.outputs.percentage }}%" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend**: ${{ steps.frontend-coverage.outputs.percentage }}%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Status" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY

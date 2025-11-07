@@ -1,8 +1,10 @@
-name: Auto-Merge PR on Successful Build
+name: Auto-Merge PR on Successful CI
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["CI - Tests and Coverage"]
+    types:
+      - completed
     branches:
       - main
 
@@ -11,45 +13,34 @@ permissions:
   pull-requests: write
 
 jobs:
-  build-and-merge:
+  auto-merge:
     runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.x'
-          cache: 'npm'
-          cache-dependency-path: |
-            app/backend/package-lock.json
-            app/frontend/package-lock.json
-
-      - name: Install backend dependencies
-        working-directory: app/backend
-        run: npm install --legacy-peer-deps
-
-      - name: Build backend
-        working-directory: app/backend
-        run: npm run build
-
-      - name: Install frontend dependencies
-        working-directory: app/frontend
-        run: npm install --legacy-peer-deps
-
-      - name: Build frontend
-        working-directory: app/frontend
-        run: npm run build-only
-
-      - name: Auto-merge PR
-        if: success()
+      - name: Get PR number
+        id: pr
+        run: |
+          PR_NUMBER=$(gh pr view --json number -q .number "${GITHUB_HEAD_REF}" || echo "")
+          if [ -z "$PR_NUMBER" ]; then
+            # Fallback: find PR from the workflow run
+            PR_NUMBER=$(gh api /repos/${{ github.repository }}/pulls --jq ".[] | select(.head.sha==\"${{ github.event.workflow_run.head_sha }}\") | .number" | head -n1)
+          fi
+          echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "Found PR number: $PR_NUMBER"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Auto-merge PR
+        if: steps.pr.outputs.number != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           # Enable auto-merge
           gh pr merge $PR_NUMBER --auto --squash
@@ -75,11 +66,12 @@ jobs:
           fi
 
       - name: Delete branch
-        if: success()
+        if: success() && steps.pr.outputs.number != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          # Get branch name from PR
+          BRANCH_NAME=$(gh pr view ${{ steps.pr.outputs.number }} --json headRefName -q .headRefName)
           echo "Deleting branch: $BRANCH_NAME"
           gh api \
             --method DELETE \
