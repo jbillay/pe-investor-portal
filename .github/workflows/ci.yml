@@ -44,9 +44,11 @@ jobs:
       - name: Run backend tests with coverage
         working-directory: app/backend
         run: npm run test:cov
+        continue-on-error: false
 
       - name: Extract backend coverage
         id: backend-coverage
+        if: always()
         working-directory: app/backend
         run: |
           if [ -f coverage/coverage-summary.json ]; then
@@ -59,7 +61,7 @@ jobs:
             echo "Backend coverage: $COVERAGE%"
           else
             echo "percentage=0" >> $GITHUB_OUTPUT
-            echo "No coverage file found"
+            echo "⚠️ No coverage file found - tests may have failed"
           fi
 
       # Frontend Tests
@@ -74,9 +76,11 @@ jobs:
       - name: Run frontend tests with coverage
         working-directory: app/frontend
         run: npm run test:unit -- --coverage --run
+        continue-on-error: false
 
       - name: Extract frontend coverage
         id: frontend-coverage
+        if: always()
         working-directory: app/frontend
         run: |
           if [ -f coverage/coverage-summary.json ]; then
@@ -89,14 +93,16 @@ jobs:
             echo "Frontend coverage: $COVERAGE%"
           else
             echo "percentage=0" >> $GITHUB_OUTPUT
-            echo "No coverage file found"
+            echo "⚠️ No coverage file found - tests may have failed"
           fi
 
       # Generate badges
       - name: Create badges directory
+        if: always()
         run: mkdir -p .github/badges
 
       - name: Generate backend coverage badge
+        if: always()
         run: |
           COVERAGE=${{ steps.backend-coverage.outputs.percentage }}
           COLOR="red"
@@ -109,6 +115,7 @@ jobs:
             -o .github/badges/backend-coverage.svg
 
       - name: Generate frontend coverage badge
+        if: always()
         run: |
           COVERAGE=${{ steps.frontend-coverage.outputs.percentage }}
           COLOR="red"
@@ -121,9 +128,15 @@ jobs:
             -o .github/badges/frontend-coverage.svg
 
       - name: Generate CI badge
+        if: always()
         run: |
-          curl -s "https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square&logo=github" \
-            -o .github/badges/ci-status.svg
+          if [ "${{ job.status }}" == "success" ]; then
+            curl -s "https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square&logo=github" \
+              -o .github/badges/ci-status.svg
+          else
+            curl -s "https://img.shields.io/badge/CI-failing-red?style=flat-square&logo=github" \
+              -o .github/badges/ci-status.svg
+          fi
 
       # Commit badges to main branch
       - name: Commit badges
