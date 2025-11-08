@@ -156,7 +156,8 @@ describe('TextAreaField.vue', () => {
 
       // Assert
       const textarea = wrapper.findComponent(Textarea);
-      expect(textarea.props('rows')).toBe(5);
+      // Check if rows attribute is set (PrimeVue Textarea accepts rows as prop)
+      expect(textarea.attributes('rows')).toBe('5');
     });
 
     it('should enable auto-resize', () => {
