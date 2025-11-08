@@ -20,7 +20,7 @@ module.exports = {
     '^test/(.*)$': '<rootDir>/test/$1',
   },
   collectCoverage: true,
-  coverageReporters: ['text', 'lcov', 'html'],
+  coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   coverageThreshold: {
     global: {
       branches: 80,
