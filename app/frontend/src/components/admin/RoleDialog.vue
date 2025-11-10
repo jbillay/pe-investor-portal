@@ -380,7 +380,7 @@ const initializeDialog = () => {
       active: props.role.active,
       isDefault: props.role.isDefault
     };
-    selectedPermissions.value = [...(props.matrix[props.role.id] || [])];
+    selectedPermissions.value = [...(props.role.permissions || [])];
   }
   validationErrors.value = {};
 };
@@ -526,6 +526,10 @@ const formatDate = (dateString: string) => {
 
 // Lifecycle
 onMounted(() => {
+  if (props.visible) {
+    initializeDialog();
+    checkMobileView();
+  }
   window.addEventListener('resize', checkMobileView);
 });
 </script>
