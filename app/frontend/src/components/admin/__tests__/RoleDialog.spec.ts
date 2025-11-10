@@ -35,7 +35,7 @@ vi.mock('primevue/useconfirm', () => ({
 vi.mock('primevue/dialog', () => ({
   default: {
     name: 'Dialog',
-    template: `<div v-if="visible" class="dialog"><slot name="header" /><slot /><slot name="footer" /></div>`,
+    template: `<div class="dialog" :class="$attrs.class"><slot name="header" /><slot /><slot name="footer" /></div>`,
     props: ['visible', 'modal', 'draggable', 'closable', 'style', 'contentStyle'],
     emits: ['update:visible'],
   },
@@ -71,7 +71,7 @@ vi.mock('primevue/togglebutton', () => ({
 vi.mock('primevue/card', () => ({
   default: {
     name: 'Card',
-    template: `<div class="card"><div class="card-header"><slot name="header" /></div><div class="card-content"><slot name="content" /></div></div>`,
+    template: `<div class="card"><div class="card-header"><slot name="header" /></div><div class="card-content"><slot /><slot name="content" /></div></div>`,
   },
 }))
 
@@ -99,6 +99,40 @@ vi.mock('primevue/button', () => ({
   },
 }))
 
+vi.mock('primevue/confirmdialog', () => ({
+  default: {
+    name: 'ConfirmDialog',
+    template: '<div class="confirm-dialog"></div>',
+  },
+}))
+
+const mockPermissions = [
+  {
+    id: '1',
+    name: 'read:investments',
+    description: 'Read investments',
+    category: 'INVESTMENTS',
+  },
+  {
+    id: '2',
+    name: 'read:portfolios',
+    description: 'Read portfolios',
+    category: 'PORTFOLIOS',
+  },
+  {
+    id: '3',
+    name: 'write:reports',
+    description: 'Write reports',
+    category: 'REPORTS',
+  },
+]
+
+const mockMatrix = {
+  INVESTMENTS: ['read:investments', 'write:investments'],
+  PORTFOLIOS: ['read:portfolios', 'write:portfolios'],
+  REPORTS: ['read:reports', 'write:reports'],
+}
+
 const mockRole = {
   id: '1',
   name: 'Senior Analyst',
@@ -106,7 +140,7 @@ const mockRole = {
   active: true,
   isDefault: false,
   permissions: ['read:investments', 'read:portfolios', 'write:reports'],
-  usersCount: 5,
+  userCount: 5,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 }
@@ -120,13 +154,59 @@ describe('RoleDialog', () => {
         visible: true,
         mode: 'view',
         role: null,
-        isMobile: false,
+        permissions: mockPermissions,
+        matrix: mockMatrix,
         existingRoleNames: [],
         ...props,
       },
       global: {
         stubs: {
           teleport: true,
+          PermissionSelector: true,
+        },
+        components: {
+          Dialog: {
+            name: 'Dialog',
+            template: `<div class="dialog" :class="$attrs.class"><slot name="header" /><slot /><slot name="footer" /></div>`,
+            props: ['visible', 'modal', 'draggable', 'closable', 'style', 'contentStyle'],
+          },
+          InputText: {
+            name: 'InputText',
+            template: '<input @input="$emit(\'update:modelValue\', $event.target.value)" v-bind="$attrs" />',
+            props: ['modelValue', 'readonly', 'maxlength'],
+          },
+          Textarea: {
+            name: 'Textarea',
+            template: '<textarea @input="$emit(\'update:modelValue\', $event.target.value)" v-bind="$attrs"></textarea>',
+            props: ['modelValue', 'readonly', 'rows', 'maxlength'],
+          },
+          ToggleButton: {
+            name: 'ToggleButton',
+            template: '<button @click="$emit(\'update:modelValue\', !modelValue)" v-bind="$attrs" />',
+            props: ['modelValue', 'disabled', 'onLabel', 'offLabel'],
+          },
+          Card: {
+            name: 'Card',
+            template: `<div class="card"><div class="card-header"><slot name="header" /></div><div class="card-content"><slot /><slot name="content" /></div></div>`,
+          },
+          Tag: {
+            name: 'Tag',
+            template: '<span class="tag">{{ value }}</span>',
+            props: ['value', 'severity'],
+          },
+          Divider: {
+            name: 'Divider',
+            template: '<hr class="divider" />',
+          },
+          Button: {
+            name: 'Button',
+            template: '<button @click="$emit(\'click\')" :disabled="disabled"><slot /></button>',
+            props: ['label', 'icon', 'loading', 'disabled', 'class'],
+          },
+          ConfirmDialog: {
+            name: 'ConfirmDialog',
+            template: '<div class="confirm-dialog"></div>',
+          },
         },
       },
     })
@@ -302,9 +382,10 @@ describe('RoleDialog', () => {
     })
 
     it('should prevent changing default status with system users', async () => {
-      wrapper = createWrapper({ mode: 'edit', role: mockRole })
-      wrapper.vm.hasSystemUsers = true
-      wrapper.vm.role = { ...mockRole, isDefault: true }
+      wrapper = createWrapper({
+        mode: 'edit',
+        role: { ...mockRole, isDefault: true, userCount: 5 }
+      })
       await wrapper.vm.$nextTick()
 
       expect(wrapper.vm.hasSystemUsers).toBe(true)
@@ -319,15 +400,15 @@ describe('RoleDialog', () => {
       })
       await wrapper.vm.$nextTick()
 
-      expect(wrapper.vm.formData.permissions.length).toBeGreaterThan(0)
+      expect(wrapper.vm.selectedPermissions.length).toBeGreaterThan(0)
     })
 
     it('should allow permission selection in edit mode', async () => {
       wrapper = createWrapper({ mode: 'edit' })
-      wrapper.vm.formData.permissions = ['read:users', 'write:users']
+      wrapper.vm.selectedPermissions = ['read:users', 'write:users']
       await wrapper.vm.$nextTick()
 
-      expect(wrapper.vm.formData.permissions.length).toBe(2)
+      expect(wrapper.vm.selectedPermissions.length).toBe(2)
     })
 
     it('should prevent permission editing in view mode', async () => {
@@ -349,8 +430,8 @@ describe('RoleDialog', () => {
     })
 
     it('should emit close event', async () => {
-      wrapper.vm.handleClose(false)
-      expect(wrapper.emitted('update:visible')).toBeTruthy()
+      wrapper.vm.handleClose()
+      expect(wrapper.emitted('close')).toBeTruthy()
     })
 
     it('should disable close button when loading', async () => {
@@ -363,12 +444,16 @@ describe('RoleDialog', () => {
 
   describe('Mobile Responsiveness', () => {
     it('should render on mobile', async () => {
-      wrapper = createWrapper({ isMobile: true })
+      wrapper = createWrapper()
+      wrapper.vm.isMobile = true
+      await wrapper.vm.$nextTick()
       expect(wrapper.find('.dialog').exists()).toBe(true)
     })
 
     it('should render on desktop', async () => {
-      wrapper = createWrapper({ isMobile: false })
+      wrapper = createWrapper()
+      wrapper.vm.isMobile = false
+      await wrapper.vm.$nextTick()
       expect(wrapper.find('.dialog').exists()).toBe(true)
     })
 
@@ -434,7 +519,7 @@ describe('RoleDialog', () => {
       })
       await wrapper.vm.$nextTick()
 
-      expect(wrapper.vm.role?.usersCount).toBeDefined()
+      expect(wrapper.vm.role?.userCount).toBeDefined()
     })
 
     it('should display last update date', async () => {
