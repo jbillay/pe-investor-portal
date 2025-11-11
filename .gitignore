@@ -149,3 +149,5 @@ test-logs/*
 
 # Task tracking and temporary documentation
 TASK.md
+app/frontend/role-dialog-test-output.txt
+app/frontend/test-output.txt

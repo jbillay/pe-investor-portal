@@ -12,7 +12,7 @@ export default mergeConfig(
       setupFiles: ['./src/test/setup.ts'],
       coverage: {
         provider: 'v8',
-        reporter: ['text', 'json', 'html', 'json-summary'],
+        reporter: ['text', 'json', 'html', 'json-summary', 'lcov'],
         exclude: [
           ...configDefaults.exclude,
           '**/__tests__/**',
