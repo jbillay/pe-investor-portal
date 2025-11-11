@@ -45,6 +45,34 @@ jobs:
         working-directory: app/frontend
         run: npm run build-only
 
+      - name: Run backend tests with coverage
+        working-directory: app/backend
+        run: npm run test:cov
+        continue-on-error: false
+
+      - name: Run frontend tests with coverage
+        working-directory: app/frontend
+        run: npm run test:unit -- --coverage
+        continue-on-error: false
+
+      - name: Upload backend coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./app/backend/coverage/lcov.info
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+
+      - name: Upload frontend coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./app/frontend/coverage/lcov.info
+          flags: frontend
+          name: frontend-coverage
+          fail_ci_if_error: false
+
       - name: Auto-merge PR
         if: success()
         env:
