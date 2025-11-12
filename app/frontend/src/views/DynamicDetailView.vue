@@ -222,6 +222,7 @@ const formatDate = (dateString: string) => {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
   });
 };
 
