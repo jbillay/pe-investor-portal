@@ -284,12 +284,13 @@ describe('RelationshipField.vue', () => {
       expect(mockGet).not.toHaveBeenCalled();
     });
 
-    it.skip('should handle API errors gracefully', async () => {
+    it('should handle API errors gracefully', async () => {
       // Arrange
       const field = createMockField();
       // Mock console.error to prevent error output during test
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      // First call fails
+      // Reset and setup mock to reject on first call
+      mockGet.mockReset();
       mockGet.mockRejectedValueOnce(new Error('API Error'));
 
       // Act
@@ -309,6 +310,7 @@ describe('RelationshipField.vue', () => {
       expect(wrapper.findComponent(Select).exists()).toBe(true);
       expect((wrapper.vm as any).relatedOptions).toEqual([]);
       expect((wrapper.vm as any).loading).toBe(false);
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load relationship options:', expect.any(Error));
 
       consoleSpy.mockRestore();
     });
