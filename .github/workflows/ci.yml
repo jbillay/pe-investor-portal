@@ -21,7 +21,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref }}
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -164,7 +165,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add .github/badges/*.svg
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update coverage badges [skip ci]" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update coverage badges [skip ci]" && git push origin HEAD:main)
 
       # Upload coverage reports as artifacts
       - name: Upload backend coverage report
