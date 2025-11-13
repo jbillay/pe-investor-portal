@@ -158,8 +158,8 @@ jobs:
               -o .github/badges/ci-status.svg
           fi
 
-      # Commit badges to main branch
-      - name: Commit badges
+      # Commit badges to main branch (runs on direct push to main)
+      - name: Commit badges (direct push)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -230,6 +230,27 @@ jobs:
             echo "Timeout waiting for PR to merge"
             exit 1
           fi
+
+      # Commit badges after PR merge
+      - name: Commit badges to main (after PR merge)
+        if: github.event_name == 'pull_request' && success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Checkout main branch
+          git fetch origin main
+          git checkout main
+          git pull origin main
+
+          # Configure git
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          # Copy badges to main and commit
+          mkdir -p .github/badges
+          cp -f $GITHUB_WORKSPACE/.github/badges/*.svg .github/badges/ || true
+          git add .github/badges/*.svg
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update coverage badges [skip ci]" && git push origin main)
 
       - name: Delete branch
         if: github.event_name == 'pull_request' && success()
