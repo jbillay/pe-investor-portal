@@ -292,5 +292,155 @@ describe('DashboardView', () => {
       const pluginWidgets = wrapper.findAll('.plugin-widget')
       expect(pluginWidgets.length).toBe(0)
     })
+
+    it('should render widgets when they exist', async () => {
+      // Mock widgets for each slot
+      const mockWidget = {
+        id: 'widget-1',
+        pluginId: 'test-plugin',
+        componentName: 'TestComponent',
+        props: { title: 'Test Widget' }
+      }
+
+      pluginRegistryStore.getWidgetsBySlot.mockImplementation((slot: string) => {
+        if (slot === 'dashboard-top') return [mockWidget]
+        return []
+      })
+
+      // Create new wrapper to trigger re-render
+      wrapper = createWrapper()
+      await wrapper.vm.$nextTick()
+
+      // Widget section should be rendered
+      expect(pluginRegistryStore.getWidgetsBySlot).toHaveBeenCalled()
+    })
+
+    it('should handle getWidgetComponent with valid plugin', () => {
+      const mockWidget = {
+        pluginId: 'test-plugin',
+        componentName: 'TestComponent'
+      }
+
+      const mockComponent = { name: 'TestComponent', template: '<div>Test</div>' }
+      pluginRegistryStore.getLoadedPlugin.mockReturnValue({
+        component: {
+          TestComponent: mockComponent
+        }
+      })
+
+      // Access the getWidgetComponent function through the component instance
+      const result = wrapper.vm.getWidgetComponent(mockWidget)
+
+      expect(pluginRegistryStore.getLoadedPlugin).toHaveBeenCalledWith('test-plugin')
+      expect(result).toEqual(mockComponent)
+    })
+
+    it('should return null when plugin not found', () => {
+      const mockWidget = {
+        pluginId: 'missing-plugin',
+        componentName: 'TestComponent'
+      }
+
+      pluginRegistryStore.getLoadedPlugin.mockReturnValue(null)
+
+      const result = wrapper.vm.getWidgetComponent(mockWidget)
+
+      expect(result).toBeNull()
+    })
+
+    it('should return null when component not found in plugin', () => {
+      const mockWidget = {
+        pluginId: 'test-plugin',
+        componentName: 'MissingComponent'
+      }
+
+      pluginRegistryStore.getLoadedPlugin.mockReturnValue({
+        component: {
+          OtherComponent: {}
+        }
+      })
+
+      const result = wrapper.vm.getWidgetComponent(mockWidget)
+
+      expect(result).toBeNull()
+    })
+
+    it('should return null when plugin has no component', () => {
+      const mockWidget = {
+        pluginId: 'test-plugin',
+        componentName: 'TestComponent'
+      }
+
+      pluginRegistryStore.getLoadedPlugin.mockReturnValue({
+        // No component property
+      })
+
+      const result = wrapper.vm.getWidgetComponent(mockWidget)
+
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('Computed Properties - Function Coverage', () => {
+    it('should compute currentDate with proper formatting', () => {
+      // Directly invoke the computed property
+      const date = wrapper.vm.currentDate
+
+      expect(typeof date).toBe('string')
+      // Should contain at least the year
+      expect(date).toContain(new Date().getFullYear().toString())
+    })
+
+    it('should compute isAdmin based on user roles', () => {
+      authStore.user.roles = ['USER']
+      expect(wrapper.vm.isAdmin).toBe(false)
+
+      authStore.user.roles = ['SUPER_ADMIN']
+      expect(wrapper.vm.isAdmin).toBe(true)
+    })
+
+    it('should compute pluginStats from store', () => {
+      pluginRegistryStore.pluginCount = 5
+      pluginRegistryStore.pluginStatsByStatus = { INSTALLED: 3 }
+
+      const stats = wrapper.vm.pluginStats
+
+      expect(stats.installed).toBe(5)
+      expect(stats.active).toBe(3)
+    })
+
+    it('should compute pluginStats with default values', () => {
+      pluginRegistryStore.pluginCount = 0
+      pluginRegistryStore.pluginStatsByStatus = {}
+
+      const stats = wrapper.vm.pluginStats
+
+      expect(stats.installed).toBe(0)
+      expect(stats.active).toBe(0)
+    })
+
+    it('should compute dashboardTopWidgets', () => {
+      // Mock should already be set up from beforeEach, just verify it's called
+      const widgets = wrapper.vm.dashboardTopWidgets
+
+      expect(pluginRegistryStore.getWidgetsBySlot).toHaveBeenCalled()
+      expect(Array.isArray(widgets)).toBe(true)
+    })
+
+    it('should compute dashboardCenterWidgets', () => {
+      // Mock should already be set up from beforeEach, just verify it's called
+      const widgets = wrapper.vm.dashboardCenterWidgets
+
+      expect(pluginRegistryStore.getWidgetsBySlot).toHaveBeenCalled()
+      expect(Array.isArray(widgets)).toBe(true)
+    })
+
+    it('should compute dashboardBottomWidgets', () => {
+      // Mock should already be set up from beforeEach, just verify it's called
+      const widgets = wrapper.vm.dashboardBottomWidgets
+
+      expect(pluginRegistryStore.getWidgetsBySlot).toHaveBeenCalled()
+      expect(Array.isArray(widgets)).toBe(true)
+    })
   })
 })
