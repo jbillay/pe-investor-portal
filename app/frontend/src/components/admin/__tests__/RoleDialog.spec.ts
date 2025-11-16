@@ -700,4 +700,183 @@ describe('RoleDialog', () => {
       expect(wrapper.vm.formData.description).toBe('Test Description')
     })
   })
+
+  describe('Function Coverage - Direct Invocation', () => {
+    it('should invoke toggleAllPermissions to select all', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+      wrapper.vm.selectedPermissions = []
+
+      wrapper.vm.toggleAllPermissions()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.selectedPermissions.length).toBe(wrapper.vm.permissions.length)
+    })
+
+    it('should invoke toggleAllPermissions to deselect all', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+      wrapper.vm.selectedPermissions = wrapper.vm.permissions.map((p: any) => p.id)
+
+      wrapper.vm.toggleAllPermissions()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.selectedPermissions.length).toBe(0)
+    })
+
+    it('should invoke handlePermissionToggle to add permission', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+      wrapper.vm.selectedPermissions = []
+
+      wrapper.vm.handlePermissionToggle('1')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.selectedPermissions).toContain('1')
+    })
+
+    it('should invoke handlePermissionToggle to remove permission', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+      wrapper.vm.selectedPermissions = ['1', '2']
+
+      wrapper.vm.handlePermissionToggle('1')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.selectedPermissions).not.toContain('1')
+      expect(wrapper.vm.selectedPermissions).toContain('2')
+    })
+
+    it('should invoke handleBulkToggle to grant permissions', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+      wrapper.vm.selectedPermissions = []
+
+      wrapper.vm.handleBulkToggle(['1', '2', '3'], true)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.selectedPermissions).toContain('1')
+      expect(wrapper.vm.selectedPermissions).toContain('2')
+      expect(wrapper.vm.selectedPermissions).toContain('3')
+    })
+
+    it('should invoke handleBulkToggle to revoke permissions', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+      wrapper.vm.selectedPermissions = ['1', '2', '3']
+
+      wrapper.vm.handleBulkToggle(['1', '2'], false)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.selectedPermissions).not.toContain('1')
+      expect(wrapper.vm.selectedPermissions).not.toContain('2')
+      expect(wrapper.vm.selectedPermissions).toContain('3')
+    })
+
+    it('should invoke switchToEditMode', async () => {
+      wrapper = createWrapper({ mode: 'view', role: mockRole })
+
+      wrapper.vm.switchToEditMode()
+      await wrapper.vm.$nextTick()
+
+      // Verify emit was called
+      expect(wrapper.emitted('switch-mode')).toBeTruthy()
+      expect(wrapper.emitted('switch-mode')?.[0]).toEqual(['edit'])
+    })
+
+    it('should invoke handleClone', async () => {
+      wrapper = createWrapper({ mode: 'view', role: mockRole })
+
+      wrapper.vm.handleClone()
+      await wrapper.vm.$nextTick()
+
+      // Verify emit was called
+      expect(wrapper.emitted('clone')).toBeTruthy()
+      expect(wrapper.emitted('clone')?.[0]).toEqual([mockRole])
+    })
+
+    it('should invoke confirmDelete', async () => {
+      wrapper = createWrapper({ mode: 'view', role: mockRole })
+
+      wrapper.vm.confirmDelete()
+      await wrapper.vm.$nextTick()
+
+      expect(mockConfirm.require).toHaveBeenCalled()
+    })
+
+    it('should invoke formatDate with valid date', async () => {
+      wrapper = createWrapper({ mode: 'view', role: mockRole })
+
+      const formatted = wrapper.vm.formatDate('2024-01-15T10:30:00Z')
+
+      expect(typeof formatted).toBe('string')
+      expect(formatted).toContain('2024')
+    })
+
+    it('should invoke formatDate with ISO string', async () => {
+      wrapper = createWrapper({ mode: 'view', role: mockRole })
+
+      const formatted = wrapper.vm.formatDate(new Date().toISOString())
+
+      expect(typeof formatted).toBe('string')
+    })
+
+    it('should compute isFormValid as true with valid data', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+      wrapper.vm.formData.name = 'Valid Role Name'
+      wrapper.vm.formData.description = 'Valid description'
+      wrapper.vm.validationErrors = {}
+
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.isFormValid).toBe(true)
+    })
+
+    it('should compute isFormValid as false with invalid data', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+      wrapper.vm.formData.name = ''
+      wrapper.vm.validationErrors = { name: 'Required' }
+
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.isFormValid).toBe(false)
+    })
+
+    it('should compute isFormValid as false with validation errors', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+      wrapper.vm.formData.name = 'Valid Name'
+      wrapper.vm.validationErrors = { description: 'Too long' }
+
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.isFormValid).toBe(false)
+    })
+
+    it('should invoke initializeDialog function', async () => {
+      wrapper = createWrapper({ mode: 'edit', role: mockRole })
+
+      wrapper.vm.initializeDialog()
+      await wrapper.vm.$nextTick()
+
+      // Should initialize form data from role
+      expect(wrapper.vm.formData.name).toBe(mockRole.name)
+      expect(wrapper.vm.formData.description).toBe(mockRole.description)
+    })
+
+    it('should invoke checkMobileView function', async () => {
+      wrapper = createWrapper({ mode: 'view', role: mockRole })
+
+      // Set window width
+      global.innerWidth = 500
+      wrapper.vm.checkMobileView()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.isMobile).toBe(true)
+    })
+
+    it('should invoke checkMobileView for desktop', async () => {
+      wrapper = createWrapper({ mode: 'view', role: mockRole })
+
+      // Set window width
+      global.innerWidth = 1024
+      wrapper.vm.checkMobileView()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.isMobile).toBe(false)
+    })
+  })
 })
