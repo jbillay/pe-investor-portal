@@ -3,6 +3,11 @@ import { mount, VueWrapper, flushPromises } from '@vue/test-utils';
 import PluginManager from '../PluginManager.vue';
 import type { Plugin, PluginStatistics } from '@/types/plugin';
 
+// Create persistent mock instances
+const mockToast = { add: vi.fn() };
+const mockConfirm = { require: vi.fn() };
+const mockPluginRegistryStore = { refreshPluginRegistry: vi.fn() };
+
 // Mock API and services
 vi.mock('@/services/pluginApiService', () => ({
   pluginApiService: {
@@ -16,15 +21,15 @@ vi.mock('@/services/pluginApiService', () => ({
 }));
 
 vi.mock('primevue/usetoast', () => ({
-  useToast: vi.fn(() => ({ add: vi.fn() })),
+  useToast: () => mockToast,
 }));
 
 vi.mock('primevue/useconfirm', () => ({
-  useConfirm: vi.fn(() => ({ require: vi.fn() })),
+  useConfirm: () => mockConfirm,
 }));
 
 vi.mock('@/stores/pluginRegistry', () => ({
-  usePluginRegistryStore: vi.fn(() => ({ refreshPluginRegistry: vi.fn() })),
+  usePluginRegistryStore: () => mockPluginRegistryStore,
 }));
 
 // Mock PrimeVue components
@@ -220,15 +225,12 @@ describe('PluginManager', () => {
 
     it('should handle fetch error gracefully', async () => {
       const { pluginApiService } = await import('@/services/pluginApiService');
-      const { useToast } = await import('primevue/usetoast');
 
       vi.mocked(pluginApiService.getAllPlugins).mockRejectedValueOnce(new Error('Fetch failed'));
       wrapper = createWrapper();
       await flushPromises();
 
-      // The component should have called toast.add with an error
-      const toastInstance = vi.mocked(useToast)();
-      expect(toastInstance.add).toHaveBeenCalledWith(
+      expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'error',
           summary: 'Fetch Failed',
@@ -276,7 +278,6 @@ describe('PluginManager', () => {
   describe('Plugin Actions', () => {
     it('should install a plugin', async () => {
       const { pluginApiService } = await import('@/services/pluginApiService');
-      const { useToast } = await import('primevue/usetoast');
 
       wrapper = createWrapper();
       await flushPromises();
@@ -285,8 +286,7 @@ describe('PluginManager', () => {
       await flushPromises();
 
       expect(pluginApiService.installPlugin).toHaveBeenCalledWith('plugin-1');
-      const toastInstance = vi.mocked(useToast)();
-      expect(toastInstance.add).toHaveBeenCalledWith(
+      expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'success',
           summary: 'Plugin Installed',
@@ -296,7 +296,6 @@ describe('PluginManager', () => {
 
     it('should handle install error', async () => {
       const { pluginApiService } = await import('@/services/pluginApiService');
-      const { useToast } = await import('primevue/usetoast');
 
       vi.mocked(pluginApiService.installPlugin).mockRejectedValueOnce(new Error('Install failed'));
       wrapper = createWrapper();
@@ -305,8 +304,7 @@ describe('PluginManager', () => {
       await wrapper.vm.installPlugin(mockPlugin);
       await flushPromises();
 
-      const toastInstance = vi.mocked(useToast)();
-      expect(toastInstance.add).toHaveBeenCalledWith(
+      expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'error',
           summary: 'Installation Failed',
@@ -316,7 +314,6 @@ describe('PluginManager', () => {
 
     it('should uninstall a plugin', async () => {
       const { pluginApiService } = await import('@/services/pluginApiService');
-      const { useToast } = await import('primevue/usetoast');
 
       wrapper = createWrapper();
       await flushPromises();
@@ -325,8 +322,7 @@ describe('PluginManager', () => {
       await flushPromises();
 
       expect(pluginApiService.uninstallPlugin).toHaveBeenCalledWith('plugin-1');
-      const toastInstance = vi.mocked(useToast)();
-      expect(toastInstance.add).toHaveBeenCalledWith(
+      expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'success',
           summary: 'Plugin Uninstalled',
@@ -335,15 +331,12 @@ describe('PluginManager', () => {
     });
 
     it('should show confirmation dialog before delete', async () => {
-      const { useConfirm } = await import('primevue/useconfirm');
-
       wrapper = createWrapper();
       await flushPromises();
 
       wrapper.vm.confirmDeletePlugin(mockPlugin);
 
-      const confirmInstance = vi.mocked(useConfirm)();
-      expect(confirmInstance.require).toHaveBeenCalledWith(
+      expect(mockConfirm.require).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringContaining('Test Plugin'),
           header: 'Delete Plugin',
