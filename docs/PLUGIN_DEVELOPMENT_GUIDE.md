@@ -2184,4 +2184,900 @@ For questions or issues with plugin development:
 
 ---
 
+## Advanced Plugin Development: Using Core APIs
+
+This section covers how plugins can leverage the core platform capabilities for data storage, permissions, email, and more.
+
+### Dynamic Data Objects API Integration
+
+Plugins should use the Dynamic Data Objects system for data storage instead of creating custom backend tables. This provides automatic CRUD operations, versioning, audit trails, and UI generation.
+
+#### Step 1: Define Data Object Schema
+
+First, create data objects through the admin interface or programmatically via API:
+
+```javascript
+// In your plugin's onInstall hook
+export const onInstall = async () => {
+  const context = usePluginContext('fund-marketing-plugin');
+
+  // Define a Fund data object
+  const fundObjectDefinition = {
+    name: 'Fund',
+    description: 'Investment fund information for marketing',
+    icon: 'pi-briefcase',
+    fields: [
+      {
+        name: 'fundName',
+        label: 'Fund Name',
+        fieldType: 'TEXT',
+        required: true,
+        validationRules: [
+          { type: 'minLength', value: 3 },
+          { type: 'maxLength', value: 100 }
+        ]
+      },
+      {
+        name: 'fundType',
+        label: 'Fund Type',
+        fieldType: 'SINGLE_SELECT',
+        required: true,
+        dropdownOptions: [
+          { value: 'BUYOUT', label: 'Buyout' },
+          { value: 'VENTURE', label: 'Venture Capital' },
+          { value: 'GROWTH', label: 'Growth Equity' },
+          { value: 'DEBT', label: 'Private Debt' }
+        ]
+      },
+      {
+        name: 'targetSize',
+        label: 'Target Fund Size',
+        fieldType: 'CURRENCY',
+        required: true
+      },
+      {
+        name: 'vintage',
+        label: 'Vintage Year',
+        fieldType: 'NUMBER',
+        required: true,
+        validationRules: [
+          { type: 'min', value: 2000 },
+          { type: 'max', value: 2050 }
+        ]
+      },
+      {
+        name: 'strategy',
+        label: 'Investment Strategy',
+        fieldType: 'RICH_TEXT',
+        required: true
+      },
+      {
+        name: 'geographicFocus',
+        label: 'Geographic Focus',
+        fieldType: 'MULTI_SELECT',
+        dropdownOptions: [
+          { value: 'NORTH_AMERICA', label: 'North America' },
+          { value: 'EUROPE', label: 'Europe' },
+          { value: 'ASIA', label: 'Asia' },
+          { value: 'LATAM', label: 'Latin America' }
+        ]
+      },
+      {
+        name: 'fundDocuments',
+        label: 'Marketing Documents',
+        fieldType: 'FILE',
+        required: false
+      },
+      {
+        name: 'closingDate',
+        label: 'Expected Closing Date',
+        fieldType: 'DATE',
+        required: false
+      }
+    ]
+  };
+
+  // Create data object via API
+  try {
+    const response = await fetch(context.getApiUrl('/data-objects'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(fundObjectDefinition)
+    });
+
+    if (response.ok) {
+      context.showSuccess('Data Object Created', 'Fund data structure has been initialized');
+    }
+  } catch (error) {
+    context.showError('Installation Error', 'Failed to create data object');
+    console.error(error);
+  }
+};
+```
+
+#### Step 2: CRUD Operations with Dynamic Data
+
+Once data objects are defined, use the Dynamic Data API for all operations:
+
+```javascript
+const { ref, onMounted } = window.Vue;
+const context = usePluginContext('fund-marketing-plugin');
+
+// Component for managing funds
+const FundManagement = {
+  name: 'FundManagement',
+  setup() {
+    const funds = ref([]);
+    const loading = ref(false);
+
+    // LIST: Fetch all funds
+    const loadFunds = async () => {
+      loading.value = true;
+      try {
+        const response = await fetch(
+          context.getApiUrl('/dynamic/Fund?page=1&limit=50'),
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+
+        const data = await response.json();
+        funds.value = data.instances || [];
+      } catch (error) {
+        context.showError('Load Error', 'Failed to load funds');
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // CREATE: Add new fund
+    const createFund = async (fundData) => {
+      try {
+        const response = await fetch(
+          context.getApiUrl('/dynamic/Fund'),
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              fieldValues: {
+                fundName: fundData.name,
+                fundType: fundData.type,
+                targetSize: fundData.targetSize,
+                vintage: fundData.vintage,
+                strategy: fundData.strategy,
+                geographicFocus: fundData.geography,
+                closingDate: fundData.closingDate
+              }
+            })
+          }
+        );
+
+        if (response.ok) {
+          context.showSuccess('Fund Created', 'New fund has been added');
+          await loadFunds(); // Reload list
+        }
+      } catch (error) {
+        context.showError('Create Error', error.message);
+      }
+    };
+
+    // UPDATE: Modify existing fund
+    const updateFund = async (fundId, updates) => {
+      try {
+        const response = await fetch(
+          context.getApiUrl(`/dynamic/Fund/${fundId}`),
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              fieldValues: updates
+            })
+          }
+        );
+
+        if (response.ok) {
+          context.showSuccess('Fund Updated', 'Changes have been saved');
+          await loadFunds();
+        }
+      } catch (error) {
+        context.showError('Update Error', error.message);
+      }
+    };
+
+    // DELETE: Remove fund
+    const deleteFund = async (fundId) => {
+      try {
+        const response = await fetch(
+          context.getApiUrl(`/dynamic/Fund/${fundId}`),
+          {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+
+        if (response.ok) {
+          context.showSuccess('Fund Deleted', 'Fund has been removed');
+          await loadFunds();
+        }
+      } catch (error) {
+        context.showError('Delete Error', error.message);
+      }
+    };
+
+    // READ: Get single fund with full details
+    const getFund = async (fundId) => {
+      try {
+        const response = await fetch(
+          context.getApiUrl(`/dynamic/Fund/${fundId}`),
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+
+        const fund = await response.json();
+        return fund;
+      } catch (error) {
+        context.showError('Load Error', error.message);
+        return null;
+      }
+    };
+
+    onMounted(() => {
+      loadFunds();
+    });
+
+    return {
+      funds,
+      loading,
+      createFund,
+      updateFund,
+      deleteFund,
+      getFund
+    };
+  },
+
+  template: `
+    <div class="p-6">
+      <h1 class="text-2xl font-bold mb-6">Fund Management</h1>
+
+      <div v-if="loading" class="text-center py-12">
+        <i class="pi pi-spin pi-spinner text-4xl text-purple-600"></i>
+        <p class="mt-4 text-gray-600">Loading funds...</p>
+      </div>
+
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          v-for="fund in funds"
+          :key="fund.id"
+          class="bg-white rounded-lg shadow-lg p-6 border border-gray-200"
+        >
+          <h3 class="text-lg font-semibold mb-2">
+            {{ fund.fieldValues.fundName }}
+          </h3>
+          <p class="text-sm text-gray-600 mb-4">
+            {{ fund.fieldValues.fundType }} • {{ fund.fieldValues.vintage }}
+          </p>
+          <div class="flex gap-2">
+            <button
+              @click="() => getFund(fund.id)"
+              class="flex-1 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+            >
+              View
+            </button>
+            <button
+              @click="() => deleteFund(fund.id)"
+              class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+};
+```
+
+#### Step 3: Using Relationships Between Data Objects
+
+Link data objects using the RELATIONSHIP field type:
+
+```javascript
+// Define related data object (e.g., Fund Documents)
+const documentObjectDefinition = {
+  name: 'FundDocument',
+  description: 'Documents related to funds',
+  fields: [
+    {
+      name: 'fund',
+      label: 'Related Fund',
+      fieldType: 'RELATIONSHIP',
+      required: true,
+      relationshipTarget: 'Fund' // Links to Fund data object
+    },
+    {
+      name: 'documentTitle',
+      label: 'Document Title',
+      fieldType: 'TEXT',
+      required: true
+    },
+    {
+      name: 'documentFile',
+      label: 'File',
+      fieldType: 'FILE',
+      required: true
+    },
+    {
+      name: 'category',
+      label: 'Category',
+      fieldType: 'SINGLE_SELECT',
+      dropdownOptions: [
+        { value: 'PPM', label: 'Private Placement Memorandum' },
+        { value: 'FACTSHEET', label: 'Fact Sheet' },
+        { value: 'PRESENTATION', label: 'Investor Presentation' }
+      ]
+    }
+  ]
+};
+
+// Query documents for a specific fund
+const loadFundDocuments = async (fundId) => {
+  try {
+    // Filter by relationship
+    const response = await fetch(
+      context.getApiUrl(`/dynamic/FundDocument?filter[fund]=${fundId}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      }
+    );
+
+    const data = await response.json();
+    return data.instances;
+  } catch (error) {
+    context.showError('Load Error', 'Failed to load documents');
+    return [];
+  }
+};
+```
+
+### Permission Management and RBAC Integration
+
+Plugins must define their own permissions and integrate them into the RBAC system during installation.
+
+#### Step 1: Define Plugin Permissions
+
+In your `plugin.json`, declare the permissions your plugin provides:
+
+```json
+{
+  "id": "fund-marketing-plugin",
+  "name": "Fund Marketing Plugin",
+  "version": "1.0.0",
+  "permissions": {
+    "required": [
+      "PLUGIN_ADMIN"
+    ],
+    "provided": [
+      "FUND:VIEW",
+      "FUND:CREATE",
+      "FUND:EDIT",
+      "FUND:DELETE",
+      "FUND:PUBLISH",
+      "FUND_DOCUMENT:UPLOAD",
+      "FUND_ANALYTICS:VIEW"
+    ]
+  }
+}
+```
+
+#### Step 2: Register Permissions During Installation
+
+```javascript
+export const onInstall = async () => {
+  const context = usePluginContext('fund-marketing-plugin');
+
+  // Define permissions to create
+  const permissions = [
+    {
+      name: 'FUND:VIEW',
+      description: 'View fund marketing information',
+      resource: 'fund',
+      action: 'view',
+      scope: 'all'
+    },
+    {
+      name: 'FUND:CREATE',
+      description: 'Create new funds',
+      resource: 'fund',
+      action: 'create',
+      scope: 'own'
+    },
+    {
+      name: 'FUND:EDIT',
+      description: 'Edit fund information',
+      resource: 'fund',
+      action: 'edit',
+      scope: 'own'
+    },
+    {
+      name: 'FUND:DELETE',
+      description: 'Delete funds',
+      resource: 'fund',
+      action: 'delete',
+      scope: 'own'
+    },
+    {
+      name: 'FUND:PUBLISH',
+      description: 'Publish funds to investor portal',
+      resource: 'fund',
+      action: 'publish',
+      scope: 'all'
+    },
+    {
+      name: 'FUND_DOCUMENT:UPLOAD',
+      description: 'Upload fund marketing documents',
+      resource: 'fund-document',
+      action: 'upload',
+      scope: 'own'
+    },
+    {
+      name: 'FUND_ANALYTICS:VIEW',
+      description: 'View fund analytics and metrics',
+      resource: 'fund-analytics',
+      action: 'view',
+      scope: 'all'
+    }
+  ];
+
+  // Register each permission via API
+  for (const permission of permissions) {
+    try {
+      await fetch(context.getApiUrl('/admin/permissions'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(permission)
+      });
+    } catch (error) {
+      console.error(`Failed to create permission ${permission.name}:`, error);
+    }
+  }
+
+  context.showSuccess('Permissions Registered', 'Plugin permissions have been added to RBAC system');
+};
+```
+
+#### Step 3: Check Permissions in Plugin Code
+
+```javascript
+const FundEditor = {
+  name: 'FundEditor',
+  setup() {
+    const context = usePluginContext('fund-marketing-plugin');
+    const canCreate = ref(false);
+    const canEdit = ref(false);
+    const canDelete = ref(false);
+    const canPublish = ref(false);
+
+    // Check permissions on mount
+    onMounted(() => {
+      canCreate.value = context.hasPermission('FUND:CREATE');
+      canEdit.value = context.hasPermission('FUND:EDIT');
+      canDelete.value = context.hasPermission('FUND:DELETE');
+      canPublish.value = context.hasPermission('FUND:PUBLISH');
+    });
+
+    const handleCreate = () => {
+      if (!canCreate.value) {
+        context.showError('Permission Denied', 'You do not have permission to create funds');
+        return;
+      }
+      // Proceed with creation
+    };
+
+    return {
+      canCreate,
+      canEdit,
+      canDelete,
+      canPublish,
+      handleCreate
+    };
+  },
+
+  template: `
+    <div>
+      <button
+        v-if="canCreate"
+        @click="handleCreate"
+        class="px-4 py-2 bg-purple-600 text-white rounded"
+      >
+        Create Fund
+      </button>
+
+      <p v-else class="text-gray-500">
+        You do not have permission to create funds
+      </p>
+    </div>
+  `
+};
+```
+
+#### Step 4: Assign Permissions to Roles
+
+After installation, admins should assign plugin permissions to appropriate roles:
+
+```javascript
+// Utility function to assign permissions to a role
+const assignPermissionsToRole = async (roleName, permissionNames) => {
+  const context = usePluginContext('fund-marketing-plugin');
+
+  try {
+    // Get role ID
+    const rolesResponse = await fetch(
+      context.getApiUrl(`/admin/roles?name=${roleName}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      }
+    );
+    const roles = await rolesResponse.json();
+    const role = roles[0];
+
+    if (!role) {
+      context.showError('Role Not Found', `Role ${roleName} does not exist`);
+      return;
+    }
+
+    // Get permission IDs
+    for (const permissionName of permissionNames) {
+      const permResponse = await fetch(
+        context.getApiUrl(`/admin/permissions?name=${permissionName}`),
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      const permissions = await permResponse.json();
+      const permission = permissions[0];
+
+      if (permission) {
+        // Assign permission to role
+        await fetch(
+          context.getApiUrl(`/admin/roles/${role.id}/permissions`),
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ permissionId: permission.id })
+          }
+        );
+      }
+    }
+
+    context.showSuccess('Permissions Assigned', `Permissions assigned to ${roleName} role`);
+  } catch (error) {
+    context.showError('Assignment Error', error.message);
+  }
+};
+
+// Usage in setup wizard or admin panel
+assignPermissionsToRole('INVESTOR', ['FUND:VIEW']);
+assignPermissionsToRole('FUND_MANAGER', [
+  'FUND:VIEW',
+  'FUND:CREATE',
+  'FUND:EDIT',
+  'FUND_DOCUMENT:UPLOAD',
+  'FUND_ANALYTICS:VIEW'
+]);
+assignPermissionsToRole('SUPER_ADMIN', [
+  'FUND:VIEW',
+  'FUND:CREATE',
+  'FUND:EDIT',
+  'FUND:DELETE',
+  'FUND:PUBLISH',
+  'FUND_DOCUMENT:UPLOAD',
+  'FUND_ANALYTICS:VIEW'
+]);
+```
+
+### Email Integration
+
+Plugins can send emails using the core email system:
+
+```javascript
+// Send email using existing template
+const sendFundPublishedEmail = async (fundId, recipientEmail) => {
+  const context = usePluginContext('fund-marketing-plugin');
+
+  try {
+    // First, get the fund data
+    const fund = await getFund(fundId);
+
+    // Send email using template
+    const response = await fetch(
+      context.getApiUrl('/email/send'),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          templateName: 'fund-published', // Must be created in email templates
+          to: recipientEmail,
+          variables: {
+            fundName: fund.fieldValues.fundName,
+            fundType: fund.fieldValues.fundType,
+            targetSize: fund.fieldValues.targetSize,
+            vintage: fund.fieldValues.vintage,
+            portalUrl: window.location.origin
+          }
+        })
+      }
+    );
+
+    if (response.ok) {
+      context.showSuccess('Email Sent', `Notification sent to ${recipientEmail}`);
+    }
+  } catch (error) {
+    context.showError('Email Error', 'Failed to send notification');
+  }
+};
+
+// Create email template during plugin installation
+export const onInstall = async () => {
+  const context = usePluginContext('fund-marketing-plugin');
+
+  const emailTemplate = {
+    name: 'fund-published',
+    subject: 'New Fund Available: {{fundName}}',
+    category: 'SYSTEM',
+    body: `
+      <h1>New Investment Opportunity</h1>
+      <p>A new fund has been published to the investor portal:</p>
+
+      <h2>{{fundName}}</h2>
+      <ul>
+        <li><strong>Type:</strong> {{fundType}}</li>
+        <li><strong>Target Size:</strong> ${{targetSize}}</li>
+        <li><strong>Vintage:</strong> {{vintage}}</li>
+      </ul>
+
+      <p>
+        <a href="{{portalUrl}}/funds/{{fundId}}" style="background: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+          View Fund Details
+        </a>
+      </p>
+    `,
+    variablesSchema: {
+      fundName: { type: 'string', required: true },
+      fundType: { type: 'string', required: true },
+      targetSize: { type: 'number', required: true },
+      vintage: { type: 'number', required: true },
+      portalUrl: { type: 'string', required: true },
+      fundId: { type: 'string', required: true }
+    }
+  };
+
+  try {
+    await fetch(context.getApiUrl('/email/templates'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(emailTemplate)
+    });
+
+    context.showSuccess('Email Template Created', 'Fund notification template is ready');
+  } catch (error) {
+    console.error('Failed to create email template:', error);
+  }
+};
+```
+
+### Audit Trail Integration
+
+Log important plugin actions to the audit trail:
+
+```javascript
+const logAuditEvent = async (action, resourceType, resourceId, metadata = {}) => {
+  const context = usePluginContext('fund-marketing-plugin');
+
+  try {
+    await fetch(context.getApiUrl('/admin/audit-trail'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        action,
+        resourceType,
+        resourceId,
+        metadata: {
+          plugin: 'fund-marketing-plugin',
+          ...metadata
+        }
+      })
+    });
+  } catch (error) {
+    console.error('Audit logging failed:', error);
+  }
+};
+
+// Usage examples
+const publishFund = async (fundId) => {
+  const context = usePluginContext('fund-marketing-plugin');
+
+  try {
+    // Update fund status
+    await updateFund(fundId, { status: 'PUBLISHED' });
+
+    // Log the action
+    await logAuditEvent(
+      'FUND_PUBLISHED',
+      'Fund',
+      fundId,
+      {
+        publishedBy: context.currentUser.value?.email,
+        publishedAt: new Date().toISOString()
+      }
+    );
+
+    context.showSuccess('Fund Published', 'Fund is now visible to investors');
+  } catch (error) {
+    context.showError('Publish Error', error.message);
+  }
+};
+```
+
+### Inter-Plugin Communication
+
+Share data and events between plugins:
+
+```javascript
+// Plugin A: Fund Marketing Plugin
+const FundMarketingPlugin = {
+  setup() {
+    const context = usePluginContext('fund-marketing-plugin');
+
+    const publishFund = (fundId, fundData) => {
+      // Emit event for other plugins
+      context.emitEvent('fund-published', {
+        fundId,
+        fundName: fundData.fundName,
+        fundType: fundData.fundType,
+        timestamp: new Date().toISOString()
+      });
+
+      context.showSuccess('Fund Published', 'Other plugins have been notified');
+    };
+
+    return { publishFund };
+  }
+};
+
+// Plugin B: Analytics Plugin (listening to fund events)
+const AnalyticsPlugin = {
+  setup() {
+    const context = usePluginContext('analytics-plugin');
+    const fundPublications = ref([]);
+
+    // Listen for fund publication events
+    const handleFundPublished = (payload) => {
+      console.log('Fund published event received:', payload);
+
+      // Track the event
+      fundPublications.value.push(payload);
+
+      // Update analytics
+      trackEvent('fund_published', {
+        fundId: payload.fundId,
+        fundType: payload.fundType
+      });
+
+      // Show notification
+      context.showInfo(
+        'New Fund Published',
+        `${payload.fundName} has been published`
+      );
+    };
+
+    onMounted(() => {
+      // Subscribe to fund-marketing-plugin events
+      context.onEvent('fund-marketing-plugin:fund-published', handleFundPublished);
+    });
+
+    onUnmounted(() => {
+      // Clean up listener
+      context.offEvent('fund-marketing-plugin:fund-published', handleFundPublished);
+    });
+
+    return {
+      fundPublications
+    };
+  }
+};
+```
+
+### Accessing Shared Data Between Plugins
+
+```javascript
+// Plugin A: Save data that other plugins can access
+const PluginA = {
+  setup() {
+    const context = usePluginContext('plugin-a');
+
+    const saveSharedData = () => {
+      // Save to own plugin storage (scoped)
+      context.setPluginData('my-data', { value: 123 });
+
+      // Emit event with data for other plugins
+      context.emitEvent('data-updated', { value: 123 });
+    };
+
+    return { saveSharedData };
+  }
+};
+
+// Plugin B: Access data from Plugin A
+const PluginB = {
+  setup() {
+    const context = usePluginContext('plugin-b');
+    const sharedValue = ref(null);
+
+    // Listen for data updates from Plugin A
+    context.onEvent('plugin-a:data-updated', (payload) => {
+      sharedValue.value = payload.value;
+    });
+
+    // Alternatively, query dynamic data directly
+    const loadSharedFundData = async () => {
+      // Both plugins can access the same dynamic data objects
+      const response = await fetch(
+        context.getApiUrl('/dynamic/Fund'),
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      const funds = await response.json();
+      return funds.instances;
+    };
+
+    return {
+      sharedValue,
+      loadSharedFundData
+    };
+  }
+};
+```
+
+---
+
 **End of Plugin Development Guide**
