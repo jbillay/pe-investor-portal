@@ -15,49 +15,76 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { usePluginRegistryStore } from '@/stores/pluginRegistry';
 
 interface NavItem {
   label: string;
   icon: string;
   path: string;
+  order: number;
 }
 
 const router = useRouter();
 const route = useRoute();
+const pluginRegistryStore = usePluginRegistryStore();
 
-const navItems: NavItem[] = [
-  {
-    label: 'Users',
-    icon: 'pi-users',
-    path: '/admin/users'
-  },
-  {
-    label: 'Roles',
-    icon: 'pi-key',
-    path: '/admin/roles'
-  },
-  {
-    label: 'Data Objects',
-    icon: 'pi-database',
-    path: '/admin/data-objects'
-  },
-  {
-    label: 'Analytics',
-    icon: 'pi-chart-bar',
-    path: '/admin/analytics'
-  },
-  {
-    label: 'Email Templates',
-    icon: 'pi-envelope',
-    path: '/admin/email-templates'
-  },
-  {
-    label: 'Plugins',
-    icon: 'pi-box',
-    path: '/admin/plugins'
-  }
-];
+const navItems = computed(() => {
+  // Core admin menu items with order
+  const coreItems: NavItem[] = [
+    {
+      label: 'Users',
+      icon: 'pi-users',
+      path: '/admin/users',
+      order: 10
+    },
+    {
+      label: 'Roles',
+      icon: 'pi-key',
+      path: '/admin/roles',
+      order: 20
+    },
+    {
+      label: 'Data Objects',
+      icon: 'pi-database',
+      path: '/admin/data-objects',
+      order: 30
+    },
+    {
+      label: 'Analytics',
+      icon: 'pi-chart-bar',
+      path: '/admin/analytics',
+      order: 40
+    },
+    {
+      label: 'Email Templates',
+      icon: 'pi-envelope',
+      path: '/admin/email-templates',
+      order: 50
+    },
+    {
+      label: 'Plugins',
+      icon: 'pi-box',
+      path: '/admin/plugins',
+      order: 60
+    }
+  ];
+
+  // Add plugin admin menu items
+  const pluginMenus = pluginRegistryStore.adminMenuItems;
+  pluginMenus.forEach(menu => {
+    coreItems.push({
+      label: menu.label,
+      icon: menu.icon || 'pi-puzzle-piece',
+      path: menu.route,
+      order: menu.order
+    });
+  });
+
+  // Sort by order
+  return coreItems.sort((a, b) => a.order - b.order);
+});
 
 const navigateTo = (path: string) => {
   router.push(path);
